@@ -18,7 +18,7 @@ NetLink-NetStore/
 
 ---
 
-## Design Guidelines & UI/UX Standards (Design-Vorschriften)
+## Design Guidelines & UI/UX Standards
 
 To ensure all applications in NetStore maintain a cohesive, modern, and high-quality visual identity within the NetLink ecosystem, developers must adhere to the following design standards:
 
