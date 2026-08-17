@@ -2,5 +2,13 @@
   "name": "net-graph",
   "version": "1.0.0",
   "description": "Network Topology Graph",
-  "entrypoint": "frontend/dist/index.html"
+  "entrypoint": "frontend/dist/index.html",
+  "runInBackground": true,
+  "requestedPermissions": {
+    "allowRead": true,
+    "allowWrite": true,
+    "allowNet": true,
+    "allowRun": true,
+    "allowRunCommands": ["ping", "sh", "ip", "hostname"]
+  }
 }

@@ -9,37 +9,34 @@ export default function App() {
 
   const urlParams = new URLSearchParams(window.location.search);
   const ticket = urlParams.get('ticket');
-  
+
   useEffect(() => {
-    // We can fetch target from the window message or it might be passed as a query param. 
-    // Let's rely on ticket auth. The backend can infer target from the ticket if needed, or we just pass it.
-    // In DynamicAppLoader, we could pass target as a URL param.
-    // For now, let's just fetch servers using the ticket.
     fetchServers();
   }, [ticket]);
 
-  const fetchServers = async () => {
+  const fetchServers = async (refresh: boolean = false) => {
     setIsScanning(true);
     try {
-        const res = await fetch(`/api/servers`, {
-            headers: {
-                'Authorization': `Ticket ${ticket}`
-            }
-        });
-        if (!res.ok) {
-            throw new Error('Failed to scan network');
+      const url = refresh ? `/api/net-graph/scan?refresh=true` : `/api/net-graph/scan`;
+      const res = await fetch(url, {
+        headers: {
+          'Authorization': `Ticket ${ticket}`
         }
-        const devices = await res.json();
-        setServers(devices);
+      });
+      if (!res.ok) {
+        throw new Error('Failed to scan network');
+      }
+      const devices = await res.json();
+      setServers(devices);
     } catch (err: any) {
-        console.error('Failed to fetch servers', err);
+      console.error('Failed to fetch servers', err);
     } finally {
-        setIsScanning(false);
+      setIsScanning(false);
     }
   };
 
   const openApp = (appId: string, title: string, extraParams: any = {}) => {
-      window.parent.postMessage({ type: 'open_app', appId, title, extraParams }, '*');
+    window.parent.postMessage({ type: 'open_app', appId, title, extraParams }, '*');
   };
 
   return (
@@ -51,7 +48,7 @@ export default function App() {
           onVncClick={(ip: string) => openApp('vnc-viewer', `VNC: ${ip}`, { ip })}
           onSftpClick={(ip: string) => openApp('sftp-client', `SFTP: ${ip}`, { ip })}
           isScanning={isScanning}
-          onScanClick={fetchServers}
+          onScanClick={() => fetchServers(true)}
           ticket={ticket || ''}
         />
       </Box>

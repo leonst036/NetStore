@@ -1,0 +1,53 @@
+{
+  "id": "minecraft-server-management",
+  "name": "Minecraft Server Management",
+  "version": "1.0.1",
+  "author": "NetLink",
+  "category": "Games",
+  "color": "#10b981",
+  "icon": "Gamepad2",
+  "target": "local-server",
+  "defaultTarget": "local-server",
+  "targets": [
+    "local-server"
+  ],
+  "shortDesc": "Manage remote Minecraft servers with live Wings telemetry, terminal, and backups.",
+  "fullDesc": "Deploy and control remote Minecraft instances across Linux nodes via Wings daemon with CPU & RAM telemetry, interactive console with syntax highlighting, web file manager, and full snapshot backup system.",
+  "main": "frontend/dist/index.html",
+  "entrypoint": "frontend/dist/index.html",
+  "runInBackground": true,
+  "backend": "index.ts",
+  "requestedPermissions": {
+    "allowRead": true,
+    "allowWrite": true,
+    "allowNet": true,
+    "allowRun": true,
+    "allowDatabase": true,
+    "collections": [
+      "nodes",
+      "servers",
+      "audit_logs"
+    ],
+    "allowRunCommands": [
+      "ping",
+      "sh",
+      "bash",
+      "ip",
+      "hostname",
+      "java",
+      "docker",
+      "screen",
+      "systemctl",
+      "tar",
+      "df",
+      "cpulimit"
+    ],
+    "allowPortForwarding": true,
+    "allowExposePorts": [
+      25565,
+      25566,
+      25567,
+      19132
+    ]
+  }
+}

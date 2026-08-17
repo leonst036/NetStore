@@ -63,7 +63,7 @@ export default function App() {
     term.writeln("\x1b[90mEnter Target IP, Username & Password, then click Connect to start SSH session.\x1b[0m\r\n");
 
     setTimeout(() => {
-      try { fitAddon.fit(); } catch (e) {}
+      try { fitAddon.fit(); } catch (e) { }
     }, 100);
 
     termRef.current = term;
@@ -71,7 +71,8 @@ export default function App() {
 
     const handleResize = () => {
       if (fitAddonRef.current && termRef.current?.element) {
-        try { fitAddonRef.current.fit(); } catch (err) {}
+        try { fitAddonRef.current.fit(); } catch (err) { }
+        console.log("Debug: Terminal resized");
       }
     };
 
@@ -81,9 +82,9 @@ export default function App() {
       window.removeEventListener("resize", handleResize);
       if (socketRef.current) socketRef.current.close();
       if (inputDisposableRef.current) {
-        try { inputDisposableRef.current.dispose(); } catch (e) {}
+        try { inputDisposableRef.current.dispose(); } catch (e) { }
       }
-      try { term.dispose(); } catch (e) {}
+      try { term.dispose(); } catch (e) { }
     };
   }, []);
 
@@ -93,11 +94,11 @@ export default function App() {
       socketRef.current = null;
     }
     if (inputDisposableRef.current) {
-      try { inputDisposableRef.current.dispose(); } catch (e) {}
+      try { inputDisposableRef.current.dispose(); } catch (e) { }
       inputDisposableRef.current = null;
     }
     if (termRef.current) {
-      try { termRef.current.write("\r\n\x1b[31m[Detached from server]\x1b[0m\r\n"); } catch (e) {}
+      try { termRef.current.write("\r\n\x1b[31m[Detached from server]\x1b[0m\r\n"); } catch (e) { }
     }
     setStatus("disconnected");
     setIsConnected(false);
@@ -109,7 +110,7 @@ export default function App() {
     if (socketRef.current) socketRef.current.close();
 
     if (inputDisposableRef.current) {
-      try { inputDisposableRef.current.dispose(); } catch (e) {}
+      try { inputDisposableRef.current.dispose(); } catch (e) { }
       inputDisposableRef.current = null;
     }
 
@@ -127,7 +128,7 @@ export default function App() {
     const protocol = isSecure ? "wss:" : "ws:";
     const host = window.location.host;
 
-    const socketUrl = `${protocol}//${host}/client?ticket=${encodeURIComponent(ticket)}&target=${encodeURIComponent(target)}&sessionId=${encodeURIComponent(sessionId)}`;
+    const socketUrl = `${protocol}//${host}/api/net-terminal/ws?ticket=${encodeURIComponent(ticket)}&target=${encodeURIComponent(target)}&sessionId=${encodeURIComponent(sessionId)}`;
     const socket = new WebSocket(socketUrl);
     socket.binaryType = "arraybuffer";
     socketRef.current = socket;
@@ -157,7 +158,7 @@ export default function App() {
           }));
           return;
         }
-      } catch (err) {}
+      } catch (err) { }
 
       term.write(textData);
     };
@@ -168,7 +169,7 @@ export default function App() {
       setIsConnected(false);
       term.write(`\r\n\x1b[31mConnection closed. Code: ${event.code}\x1b[0m\r\n`);
       if (inputDisposableRef.current) {
-        try { inputDisposableRef.current.dispose(); } catch (e) {}
+        try { inputDisposableRef.current.dispose(); } catch (e) { }
         inputDisposableRef.current = null;
       }
     };
@@ -196,7 +197,7 @@ export default function App() {
   // Fetch saved logins using ticket
   useEffect(() => {
     if (!ticket) return;
-    
+
     fetch("/api/server-logins", { headers: { "Authorization": `Ticket ${ticket}` } })
       .then(res => res.json())
       .then(data => {
@@ -206,7 +207,7 @@ export default function App() {
       })
       .catch(err => console.error("Failed to fetch logins", err));
 
-    fetch("/api/ssh-sessions", { headers: { "Authorization": `Ticket ${ticket}` } })
+    fetch("/api/net-terminal/ssh-sessions", { headers: { "Authorization": `Ticket ${ticket}` } })
       .then(res => res.json())
       .then(data => {
         if (data.sessions) {
@@ -241,7 +242,7 @@ export default function App() {
     const name = prompt("Enter a name for this session:", `${sshUsername}@${selectedIp}`);
     if (!name) return;
 
-    fetch("/api/ssh-sessions", {
+    fetch("/api/net-terminal/ssh-sessions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -255,14 +256,14 @@ export default function App() {
         sshUsername
       })
     })
-    .then(res => res.json())
-    .then(data => {
-      if (data.success) {
-        setStoredSessions([...storedSessions, { sessionId: activeSessionId, name, target, ip: selectedIp, sshUsername }]);
-        alert("Session saved!");
-      }
-    })
-    .catch(err => console.error("Failed to save session", err));
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setStoredSessions([...storedSessions, { sessionId: activeSessionId, name, target, ip: selectedIp, sshUsername }]);
+          alert("Session saved!");
+        }
+      })
+      .catch(err => console.error("Failed to save session", err));
   };
 
   return (

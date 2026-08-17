@@ -1,0 +1,463 @@
+// Process Manager Module for Minecraft Wings Daemon
+// Handles Java process spawning, stdin/stdout streaming, graceful shutdown, and real-time resource telemetry (CPU, RAM, Disk).
+
+export interface RunningProcess {
+  child: Deno.ChildProcess;
+  stdinWriter: WritableStreamDefaultWriter<Uint8Array>;
+  logs: string[];
+  startedAt: number;
+  ramLimitMb: number;
+  cpuLimitPercent: number;
+  lastCpuTime?: number;
+  lastSampleTime?: number;
+  overLimitSince?: number | null;
+  watchdogTimer?: any;
+}
+
+export interface ServerStats {
+  cpuPercent: number;
+  cpuLimitPercent: number;
+  memoryMb: number;
+  memoryLimitMb: number;
+  diskMb: number;
+  uptimeSeconds: number;
+  status: "online" | "offline";
+}
+
+export interface ResourceConfig {
+  ramMb: number;
+  cpuLimitPercent: number;
+}
+
+export const activeServers = new Map<string, RunningProcess>();
+
+type LogListener = (serverId: string, line: string) => void;
+type ExitListener = (serverId: string) => void;
+const logListeners: LogListener[] = [];
+const exitListeners: ExitListener[] = [];
+
+export function registerLogListener(fn: LogListener): void {
+  logListeners.push(fn);
+}
+
+export function registerExitListener(fn: ExitListener): void {
+  exitListeners.push(fn);
+}
+
+// Helper to append log messages with max buffer of 500 lines
+export function appendLog(serverId: string, line: string): void {
+  const instance = activeServers.get(serverId);
+  if (instance) {
+    if (instance.logs.length > 500) {
+      instance.logs.shift();
+    }
+    instance.logs.push(line);
+  }
+  for (const listener of logListeners) {
+    try {
+      listener(serverId, line);
+    } catch {}
+  }
+}
+
+// Calculate directory disk space in MB
+async function getDirectorySizeMb(dirPath: string): Promise<number> {
+  let totalBytes = 0;
+  try {
+    for await (const entry of Deno.readDir(dirPath)) {
+      const fullPath = `${dirPath}/${entry.name}`;
+      try {
+        const stat = await Deno.stat(fullPath);
+        if (stat.isFile) {
+          totalBytes += stat.size;
+        } else if (stat.isDirectory) {
+          // One level shallow sub-directory sum to remain fast
+          for await (const sub of Deno.readDir(fullPath)) {
+            try {
+              const subStat = await Deno.stat(`${fullPath}/${sub.name}`);
+              if (subStat.isFile) totalBytes += subStat.size;
+            } catch {}
+          }
+        }
+      } catch {}
+    }
+  } catch {}
+  return Math.round((totalBytes / (1024 * 1024)) * 10) / 10;
+}
+
+// Get configured resource limits for instance
+export async function getConfiguredResources(serverPath: string): Promise<ResourceConfig> {
+  try {
+    const raw = await Deno.readTextFile(`${serverPath}/instance_config.json`);
+    const cfg = JSON.parse(raw);
+    return {
+      ramMb: typeof cfg.ramMb === "number" && cfg.ramMb > 0 ? cfg.ramMb : 1024,
+      cpuLimitPercent: typeof cfg.cpuLimitPercent === "number" && cfg.cpuLimitPercent >= 0 ? cfg.cpuLimitPercent : 0,
+    };
+  } catch {}
+  return { ramMb: 1024, cpuLimitPercent: 0 };
+}
+
+// Save configured resource limits for instance
+export async function saveConfiguredResources(
+  serverPath: string,
+  limits: { ramMb?: number; cpuLimitPercent?: number }
+): Promise<ResourceConfig> {
+  let cfg: Record<string, any> = {};
+  try {
+    const raw = await Deno.readTextFile(`${serverPath}/instance_config.json`);
+    cfg = JSON.parse(raw);
+  } catch {}
+
+  if (typeof limits.ramMb === "number" && limits.ramMb > 0) {
+    cfg.ramMb = limits.ramMb;
+  }
+  if (typeof limits.cpuLimitPercent === "number" && limits.cpuLimitPercent >= 0) {
+    cfg.cpuLimitPercent = limits.cpuLimitPercent;
+  }
+
+  await Deno.writeTextFile(`${serverPath}/instance_config.json`, JSON.stringify(cfg, null, 2));
+
+  return {
+    ramMb: cfg.ramMb || 1024,
+    cpuLimitPercent: cfg.cpuLimitPercent || 0,
+  };
+}
+
+// Sample real-time server process metrics (CPU, RAM, Disk, Uptime)
+export async function getServerProcessStats(serverId: string, serverPath: string): Promise<ServerStats> {
+  const instance = activeServers.get(serverId);
+  const diskMb = await getDirectorySizeMb(serverPath);
+  const configured = await getConfiguredResources(serverPath);
+
+  if (!instance) {
+    return {
+      cpuPercent: 0,
+      cpuLimitPercent: configured.cpuLimitPercent,
+      memoryMb: 0,
+      memoryLimitMb: configured.ramMb,
+      diskMb,
+      uptimeSeconds: 0,
+      status: "offline",
+    };
+  }
+
+  const pid = instance.child.pid;
+  let memoryMb = 0;
+  let cpuPercent = 0;
+
+  try {
+    // Read Linux /proc/<pid>/status for VmRSS
+    const statusText = await Deno.readTextFile(`/proc/${pid}/status`);
+    const rssMatch = statusText.match(/VmRSS:\s+(\d+)\s+kB/);
+    if (rssMatch) {
+      memoryMb = Math.round((parseInt(rssMatch[1], 10) / 1024) * 10) / 10;
+    }
+
+    // Read Linux /proc/<pid>/stat for CPU utime + stime
+    const statText = await Deno.readTextFile(`/proc/${pid}/stat`);
+    const statParts = statText.split(" ");
+    if (statParts.length > 14) {
+      const utime = parseInt(statParts[13], 10);
+      const stime = parseInt(statParts[14], 10);
+      const totalCpuTicks = utime + stime;
+      const now = performance.now();
+
+      if (instance.lastCpuTime !== undefined && instance.lastSampleTime !== undefined) {
+        const timeDiffSeconds = (now - instance.lastSampleTime) / 1000;
+        const ticksDiff = totalCpuTicks - instance.lastCpuTime;
+        if (timeDiffSeconds > 0) {
+          // Approx 100 ticks per second per core
+          const calculatedPercent = (ticksDiff / 100 / timeDiffSeconds) * 100;
+          cpuPercent = Math.min(Math.round(Math.max(calculatedPercent, 0) * 10) / 10, 800);
+        }
+      }
+      instance.lastCpuTime = totalCpuTicks;
+      instance.lastSampleTime = now;
+    }
+  } catch {
+    memoryMb = 0;
+  }
+
+  const uptimeSeconds = Math.round((Date.now() - instance.startedAt) / 1000);
+
+  return {
+    cpuPercent,
+    cpuLimitPercent: instance.cpuLimitPercent,
+    memoryMb,
+    memoryLimitMb: instance.ramLimitMb || configured.ramMb,
+    diskMb,
+    uptimeSeconds,
+    status: "online",
+  };
+}
+
+// Start Minecraft process
+export async function startServerProcess(
+  serverId: string,
+  serverPath: string,
+  requestedRamMb?: number,
+  jarFile: string = "server.jar"
+): Promise<boolean> {
+  if (activeServers.has(serverId)) {
+    return false;
+  }
+
+  const resources = await getConfiguredResources(serverPath);
+  const ramMb = requestedRamMb || resources.ramMb;
+  const cpuLimit = resources.cpuLimitPercent;
+
+  // Ensure eula.txt exists
+  try {
+    await Deno.writeTextFile(`${serverPath}/eula.txt`, "eula=true\n");
+  } catch {}
+
+  // Ensure server.jar exists, download if missing
+  try {
+    await Deno.stat(`${serverPath}/${jarFile}`);
+  } catch {
+    appendLog(serverId, `[Wings] ${jarFile} not found. Downloading official Minecraft 1.20.4 server jar...`);
+    try {
+      const jarUrl = "https://piston-data.mojang.com/v1/objects/8dd1a28015f51b1803213892b50b7b4fc76e594d/server.jar";
+      const jarRes = await fetch(jarUrl);
+      if (jarRes.ok) {
+        const buffer = await jarRes.arrayBuffer();
+        await Deno.writeFile(`${serverPath}/${jarFile}`, new Uint8Array(buffer));
+        appendLog(serverId, `[Wings] server.jar downloaded successfully.`);
+      } else {
+        appendLog(serverId, `[Wings] Failed to download server.jar (HTTP ${jarRes.status})`);
+        return false;
+      }
+    } catch (e: any) {
+      appendLog(serverId, `[Wings] Download error: ${e.message}`);
+      return false;
+    }
+  }
+
+  const cmd = new Deno.Command("java", {
+    args: [
+      `-Xms${Math.round(ramMb / 2)}M`,
+      `-Xmx${ramMb}M`,
+      "-jar",
+      jarFile,
+      "nogui",
+    ],
+    cwd: serverPath,
+    stdin: "piped",
+    stdout: "piped",
+    stderr: "piped",
+  });
+
+  const child = cmd.spawn();
+  const stdinWriter = child.stdin.getWriter();
+  const logs: string[] = [
+    `[Wings] Instance starting with ${ramMb}MB RAM${cpuLimit > 0 ? ` (CPU Limit: ${cpuLimit}%)` : ""}...`,
+  ];
+
+  const runningInstance: RunningProcess = {
+    child,
+    stdinWriter,
+    logs,
+    startedAt: Date.now(),
+    ramLimitMb: ramMb,
+    cpuLimitPercent: cpuLimit,
+  };
+
+  activeServers.set(serverId, runningInstance);
+
+  // Apply cpulimit if configured
+  if (cpuLimit > 0) {
+    try {
+      const limitCmd = new Deno.Command("cpulimit", {
+        args: ["-p", child.pid.toString(), "-l", cpuLimit.toString(), "-b"],
+      });
+      limitCmd.spawn();
+    } catch {
+      // cpulimit binary optional
+    }
+  }
+
+  // Pipe stdout
+  (async () => {
+    const reader = child.stdout.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (line.trim()) appendLog(serverId, line);
+        }
+      }
+    } catch {}
+  })();
+
+  // Pipe stderr
+  (async () => {
+    const reader = child.stderr.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (line.trim()) appendLog(serverId, `[STDERR] ${line}`);
+        }
+      }
+    } catch {}
+  })();
+
+  // Resource watchdog: continuously monitors RAM/CPU and kills the process if limits are exceeded for >10 seconds
+  const startResourceWatchdog = () => {
+    runningInstance.watchdogTimer = setInterval(async () => {
+      if (!activeServers.has(serverId)) {
+        if (runningInstance.watchdogTimer) clearInterval(runningInstance.watchdogTimer);
+        return;
+      }
+
+      const pid = child.pid;
+      let memoryMb = 0;
+      let cpuPercent = 0;
+
+      try {
+        // Read Linux /proc/<pid>/status for VmRSS
+        const statusText = await Deno.readTextFile(`/proc/${pid}/status`);
+        const rssMatch = statusText.match(/VmRSS:\s+(\d+)\s+kB/);
+        if (rssMatch) {
+          memoryMb = Math.round((parseInt(rssMatch[1], 10) / 1024) * 10) / 10;
+        }
+
+        // Read Linux /proc/<pid>/stat for CPU utime + stime
+        const statText = await Deno.readTextFile(`/proc/${pid}/stat`);
+        const statParts = statText.split(" ");
+        if (statParts.length > 14) {
+          const utime = parseInt(statParts[13], 10);
+          const stime = parseInt(statParts[14], 10);
+          const totalCpuTicks = utime + stime;
+          const now = performance.now();
+
+          if (runningInstance.lastCpuTime !== undefined && runningInstance.lastSampleTime !== undefined) {
+            const timeDiffSeconds = (now - runningInstance.lastSampleTime) / 1000;
+            const ticksDiff = totalCpuTicks - runningInstance.lastCpuTime;
+            if (timeDiffSeconds > 0) {
+              const calculatedPercent = (ticksDiff / 100 / timeDiffSeconds) * 100;
+              cpuPercent = Math.min(Math.round(Math.max(calculatedPercent, 0) * 10) / 10, 800);
+            }
+          }
+          runningInstance.lastCpuTime = totalCpuTicks;
+          runningInstance.lastSampleTime = now;
+        }
+      } catch {
+        return;
+      }
+
+      const isRamExceeded = runningInstance.ramLimitMb > 0 && memoryMb > runningInstance.ramLimitMb;
+      const isCpuExceeded = runningInstance.cpuLimitPercent > 0 && cpuPercent > runningInstance.cpuLimitPercent;
+
+      if (isRamExceeded || isCpuExceeded) {
+        if (!runningInstance.overLimitSince) {
+          runningInstance.overLimitSince = Date.now();
+          const reason = isRamExceeded
+            ? `RAM limit exceeded: ${memoryMb}MB / ${runningInstance.ramLimitMb}MB`
+            : `CPU limit exceeded: ${cpuPercent}% / ${runningInstance.cpuLimitPercent}%`;
+          appendLog(serverId, `[Wings/Watchdog] WARNING: ${reason}. Process will be terminated if limits remain exceeded for 10s.`);
+        } else {
+          const overLimitDurationMs = Date.now() - runningInstance.overLimitSince;
+          if (overLimitDurationMs >= 10000) {
+            const reason = isRamExceeded
+              ? `RAM usage ${memoryMb}MB / ${runningInstance.ramLimitMb}MB`
+              : `CPU usage ${cpuPercent}% / ${runningInstance.cpuLimitPercent}%`;
+            appendLog(
+              serverId,
+              `[Wings/Watchdog] KILL: Server exceeded resource limit (${reason}) for more than 10 seconds. Terminating process immediately.`
+            );
+
+            if (runningInstance.watchdogTimer) clearInterval(runningInstance.watchdogTimer);
+
+            try {
+              child.kill("SIGKILL");
+            } catch {}
+
+            activeServers.delete(serverId);
+
+            for (const listener of exitListeners) {
+              try {
+                listener(serverId);
+              } catch {}
+            }
+          }
+        }
+      } else {
+        if (runningInstance.overLimitSince) {
+          appendLog(serverId, `[Wings/Watchdog] Resource usage normalized (RAM: ${memoryMb}MB, CPU: ${cpuPercent}%).`);
+          runningInstance.overLimitSince = null;
+        }
+      }
+    }, 1000);
+  };
+
+  startResourceWatchdog();
+
+  // Monitor process completion
+  child.status.then(() => {
+    if (runningInstance.watchdogTimer) {
+      clearInterval(runningInstance.watchdogTimer);
+    }
+    activeServers.delete(serverId);
+    for (const listener of exitListeners) {
+      try {
+        listener(serverId);
+      } catch {}
+    }
+  });
+
+  return true;
+}
+
+// Stop Minecraft process gracefully
+export async function stopServerProcess(serverId: string): Promise<boolean> {
+  const instance = activeServers.get(serverId);
+  if (!instance) return false;
+
+  if (instance.watchdogTimer) {
+    clearInterval(instance.watchdogTimer);
+  }
+
+  const encoder = new TextEncoder();
+  try {
+    await instance.stdinWriter.write(encoder.encode("stop\n"));
+  } catch {
+    instance.child.kill("SIGTERM");
+  }
+
+  // Force kill if not closed within 15 seconds
+  setTimeout(() => {
+    if (activeServers.has(serverId)) {
+      try {
+        instance.child.kill("SIGKILL");
+      } catch {}
+      activeServers.delete(serverId);
+    }
+  }, 15000);
+
+  return true;
+}
+
+// Send command into server stdin
+export async function sendCommand(serverId: string, command: string): Promise<boolean> {
+  const instance = activeServers.get(serverId);
+  if (!instance) return false;
+
+  const encoder = new TextEncoder();
+  await instance.stdinWriter.write(encoder.encode(`${command.replace(/^\//, "")}\n`));
+  appendLog(serverId, `> ${command}`);
+  return true;
+}
