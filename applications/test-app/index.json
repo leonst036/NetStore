@@ -1,0 +1,5 @@
+{
+  "id": "test-app",
+  "version": "v1.0.0",
+  "entrypoint": "frontend/index.html"
+}
