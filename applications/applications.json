@@ -134,7 +134,9 @@
     "fullDesc": "Monitor and manage Minecraft servers in your network.",
     "target": "local-server",
     "defaultTarget": "local-server",
-    "targets": ["local-server"],
+    "targets": [
+      "local-server"
+    ],
     "isFeatured": true
   }
 ]
