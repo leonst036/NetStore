@@ -1,5 +1,6 @@
 export type UserRole = 'admin' | 'user';
 
+// ToDo: Update these Permissions based on the new NetStore architecture.
 export type PermissionId =
   | 'manage_users'
   | 'manage_logins'
