@@ -32,3 +32,20 @@ export const StyledFormGroup: React.FC<FormGroupProps> = (props) => (
 export const StyledTextField: React.FC<TextFieldProps> = (props) => (
     <TextField className="styled-text-field" {...props} />
 );
+
+export const SectionHeader: React.FC<BoxProps> = (props) => (
+    <Box className="section-header" {...props} />
+);
+
+export const FormFieldsContainer: React.FC<BoxProps> = (props) => (
+    <Box className="form-fields-container" {...props} />
+);
+
+export const ButtonActionsContainer: React.FC<BoxProps> = (props) => (
+    <Box className="button-actions-container" {...props} />
+);
+
+export const StyledTableContainer: React.FC<any> = (props) => (
+    <Box className="styled-table-container" {...props} />
+);
+
