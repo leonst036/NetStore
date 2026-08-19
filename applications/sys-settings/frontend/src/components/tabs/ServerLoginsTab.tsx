@@ -15,7 +15,7 @@ import {
     TableBody,
     IconButton,
     Chip
-} from '@mui/material';
+} from '@netlink/ui';
 import { Plus, Save, Server, Edit2, Trash2 } from 'lucide-react';
 import {
     SectionHeader,

@@ -15,7 +15,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions
-} from '@mui/material';
+} from '@netlink/ui';
 import './SettingsApp.css';
 import { Sidebar, TabItem } from './components/navigation/Sidebar';
 import { GeneralTab } from './components/tabs/GeneralTab';

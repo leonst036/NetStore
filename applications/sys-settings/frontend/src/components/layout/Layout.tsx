@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Card, CardContent, Select, FormGroup, TextField, type BoxProps, type CardProps, type CardContentProps, type SelectProps, type FormGroupProps, type TextFieldProps } from '@mui/material';
+import { Box, Card, CardContent, Select, FormGroup, TextField, type BoxProps, type CardProps, type CardContentProps, type SelectProps, type FormGroupProps, type TextFieldProps } from '@netlink/ui';
 
 export const VerticalStack: React.FC<BoxProps> = (props) => (
     <Box className="vertical-stack" {...props} />

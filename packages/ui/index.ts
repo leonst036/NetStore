@@ -1,5 +1,9 @@
 import { createTheme } from '@mui/material/styles';
 
+export * from '@mui/material';
+export * from './components/GeminiLoader';
+export * from './components/WindowLayout';
+
 export const getAppTheme = (themeName: string) => {
     const isDark = themeName.toLowerCase() !== 'light';
     return createTheme({
@@ -11,5 +15,3 @@ export const getAppTheme = (themeName: string) => {
     });
 };
 
-export * from './components/GeminiLoader';
-export * from './components/WindowLayout';

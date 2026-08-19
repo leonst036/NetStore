@@ -1,4 +1,4 @@
-import { Box, Typography, Card, CardContent, FormGroup, Chip, Divider } from '@mui/material'
+import { Box, Typography, Card, CardContent, FormGroup, Chip, Divider } from '@netlink/ui';
 
 export interface SecurityTabProbs {
     activeTab: string;

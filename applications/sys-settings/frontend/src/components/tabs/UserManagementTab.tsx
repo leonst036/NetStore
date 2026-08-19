@@ -1,4 +1,4 @@
-import { Box, Typography, Grid, TextField, Button, MenuItem, Divider, Select, Checkbox, Table, TableHead, TableRow, TableCell, Chip, IconButton, TableBody, CardContent, Card, Paper, FormControlLabel, TableContainer } from '@mui/material'
+import { Box, Typography, Grid, TextField, Button, MenuItem, Divider, Select, Checkbox, Table, TableHead, TableRow, TableCell, Chip, IconButton, TableBody, CardContent, Card, Paper, FormControlLabel, TableContainer } from '@netlink/ui';
 import { Edit2, Users, User, Save, Trash2, Plus } from 'lucide-react'
 import { StyledCard, StyledCardContent, FormFieldsContainer, ButtonActionsContainer, StyledTableContainer, SectionHeader } from '../layout/Layout';
 
