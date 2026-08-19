@@ -9,18 +9,12 @@ import {
 import {
   Box,
   Typography,
-  Select,
   Button,
-  Card,
-  CardContent,
-  TableContainer,
   Chip,
-  FormGroup,
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions,
-  Grid
+  DialogActions
 } from '@mui/material';
 import './SettingsApp.css';
 import { Sidebar, TabItem } from './components/navigation/Sidebar';
