@@ -5,40 +5,17 @@ import {
   Monitor,
   Shield,
   Key,
-  Plus,
-  Trash2,
-  Edit2,
-  Save,
-  Server
 } from 'lucide-react';
 import {
   Box,
-  Paper,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
   Typography,
-  TextField,
   Select,
-  MenuItem,
-  Switch,
   Button,
-  IconButton,
   Card,
   CardContent,
-  Table,
-  TableBody,
-  TableCell,
   TableContainer,
-  TableHead,
-  TableRow,
   Chip,
   FormGroup,
-  FormControlLabel,
-  Checkbox,
-  Divider,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -387,31 +364,3 @@ export default function SettingsApp({ ticket }: SettingsAppProps) {
 const RootContainer = (props: any) => <Box className="root-container" {...props} />;
 const MainContentContainer = (props: any) => <Box className="main-content-container" {...props} />;
 const ContentMaxWidth = (props: any) => <Box className="content-max-width" {...props} />;
-const StyledCard = ({ $mb, ...props }: any) => (
-  <Card className="styled-card" sx={{ mb: $mb ? 3 : 0 }} {...props} />
-);
-const StyledCardContent = (props: any) => <CardContent className="styled-card-content" {...props} />;
-const VerticalStack = (props: any) => <Box className="vertical-stack" {...props} />;
-const FlexRowSpaceBetween = (props: any) => <Box className="flex-row-space-between" {...props} />;
-const StyledSelect = (props: any) => <Select className="styled-select" {...props} />;
-const StyledFormGroup = (props: any) => <FormGroup className="styled-form-group" {...props} />;
-
-const SolidWallpaperButton = ({ $active, ...props }: any) => {
-  return <Box className="solid-wallpaper-button" sx={{ border: $active ? '2px solid #38bdf8' : '1px dashed rgba(255,255,255,0.15)', color: $active ? '#38bdf8' : '#94a3b8' }} {...props} />;
-};
-const SectionHeader = (props: any) => <Box className="section-header" {...props} />;
-const FormFieldsContainer = (props: any) => <Box className="form-fields-container" {...props} />;
-const ButtonActionsContainer = (props: any) => (
-  <Box className="button-actions-container" {...props} />
-);
-const StyledTableContainer = (props: any) => <TableContainer className="styled-table-container" {...props} />;
-const ThemeCardRoot = (props: any) => <Box className="theme-card-root" {...props} />;
-const ThemeCardPreview = ({ $color, $active, ...props }: any) => {
-  return <Box className="theme-card-preview" sx={{ backgroundColor: $color, border: $active ? '2px solid #38bdf8' : '1px solid rgba(255,255,255,0.1)' }} {...props} />;
-};
-const ThemeCardHeader = (props: any) => (
-  <Box className="theme-card-header" sx={{ backgroundColor: 'rgba(255,255,255,0.12)' }} {...props} />
-);
-const ThemeCardBody = ({ $accent, ...props }: any) => (
-  <Box className="theme-card-body" sx={{ backgroundColor: $accent || 'rgba(255,255,255,0.06)' }} {...props} />
-);
