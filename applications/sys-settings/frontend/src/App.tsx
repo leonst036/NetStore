@@ -1,5 +1,4 @@
-import { Box, createTheme, ThemeProvider, CssBaseline } from '@mui/material';
-import { WindowLayout } from '@netlink/ui';
+import { Box, createTheme, ThemeProvider, CssBaseline, WindowLayout } from '@netlink/ui';
 import SettingsApp from './SettingsApp';
 
 const darkTheme = createTheme({
@@ -56,7 +55,7 @@ export default function App() {
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
-      <WindowLayout>
+      <WindowLayout padding={0}>
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
           <SettingsApp ticket={ticket || ''} />
         </Box>

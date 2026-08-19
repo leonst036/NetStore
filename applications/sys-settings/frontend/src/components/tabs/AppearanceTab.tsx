@@ -1,5 +1,4 @@
-
-import { Box, MenuItem, Switch, Divider, Typography } from '@mui/material';
+import { Box, MenuItem, Switch, Divider, Typography } from '@netlink/ui';
 import {
     FlexRowSpaceBetween,
     StyledCard,

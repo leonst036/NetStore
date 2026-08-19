@@ -8,7 +8,7 @@ import {
     ListItemIcon,
     ListItemText,
     Typography
-} from '@mui/material';
+} from '@netlink/ui';
 import { TabId } from '../../types/settings';
 
 export interface TabItem {
