@@ -48,4 +48,3 @@ export const ButtonActionsContainer: React.FC<BoxProps> = (props) => (
 export const StyledTableContainer: React.FC<any> = (props) => (
     <Box className="styled-table-container" {...props} />
 );
-

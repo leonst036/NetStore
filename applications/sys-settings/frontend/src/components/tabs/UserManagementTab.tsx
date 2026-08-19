@@ -1,5 +1,6 @@
 import { Box, Typography, Grid, TextField, Button, MenuItem, Divider, Select, Checkbox, Table, TableHead, TableRow, TableCell, Chip, IconButton, TableBody, CardContent, Card, Paper, FormControlLabel, TableContainer } from '@mui/material'
 import { Edit2, Users, User, Save, Trash2, Plus } from 'lucide-react'
+import { StyledCard, StyledCardContent, FormFieldsContainer, ButtonActionsContainer, StyledTableContainer, SectionHeader } from '../layout/Layout';
 
 export interface UserManagementTabProps {
     activeTab: string;
@@ -13,18 +14,7 @@ export interface UserManagementTabProps {
     handleDeleteUserClick: (username: string) => void;
 }
 
-const SectionHeader = (props: any) => <Box className="section-header" {...props} />;
-const StyledCard = ({ $mb, ...props }: any) => (
-    <Card className="styled-card" sx={{ mb: $mb ? 3 : 0 }} {...props} />
-);
 
-const StyledCardContent = (props: any) => <CardContent className="styled-card-content" {...props} />;
-const FormFieldsContainer = (props: any) => <Box className="form-fields-container" {...props} />;
-
-const ButtonActionsContainer = (props: any) => (
-    <Box className="button-actions-container" {...props} />
-);
-const StyledTableContainer = (props: any) => <TableContainer className="styled-table-container" {...props} />;
 
 
 export const UserManagementTab = ({ activeTab, canManageUsers, editingUser, setEditingUser, usersList, togglePermission, ALL_PERMISSIONS, saveUser, handleDeleteUserClick }: UserManagementTabProps) => {
