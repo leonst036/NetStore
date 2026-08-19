@@ -46,8 +46,9 @@ import {
   Grid
 } from '@mui/material';
 import './SettingsApp.css';
-
-type TabId = 'general' | 'appearance' | 'logins' | 'security' | 'users';
+import { Sidebar, TabItem } from './components/navigation/Sidebar';
+import { GeneralTab } from './components/tabs/GeneralTab';
+import { TabId } from './types/settings';
 
 interface SettingsAppProps {
   ticket: string;
@@ -86,7 +87,7 @@ export default function SettingsApp({ ticket }: SettingsAppProps) {
   const permissions = getPermissions();
   const canManageUsers = permissions.includes('manage_users');
 
-  const tabs = [
+  const tabs: TabItem[] = [
     { id: 'general', label: 'General', icon: <User size={19} /> },
     { id: 'appearance', label: 'Appearance', icon: <Monitor size={19} /> },
     { id: 'logins', label: 'Server Logins', icon: <Key size={19} /> },
@@ -267,113 +268,26 @@ export default function SettingsApp({ ticket }: SettingsAppProps) {
   return (
     <RootContainer>
       {/* Sidebar */}
-      <SidebarPaper elevation={0}>
-        <SidebarHeader>
-          <Typography variant="h6" className="sidebar-title">Settings</Typography>
-        </SidebarHeader>
-        <SidebarList>
-          {tabs.map(tab => (
-            <TabListItem disablePadding key={tab.id}>
-              <TabButton
-                selected={activeTab === tab.id}
-                onClick={() => setActiveTab(tab.id as TabId)}
-              >
-                <TabIcon $active={activeTab === tab.id}>
-                  {tab.icon}
-                </TabIcon>
-                <ListItemText
-                  primary={
-                    <TabText $active={activeTab === tab.id}>
-                      {tab.label}
-                    </TabText>
-                  }
-                />
-              </TabButton>
-            </TabListItem>
-          ))}
-        </SidebarList>
-      </SidebarPaper>
+      <Sidebar tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Main Content Area */}
       <MainContentContainer>
         <ContentMaxWidth>
           {/* General Tab */}
           {activeTab === 'general' && (
-            <Box>
-              <Typography variant="h5" className="section-title">General Settings</Typography>
-
-              <StyledCard variant="outlined" $mb>
-                <StyledCardContent>
-                  <Typography variant="subtitle2" className="card-subtitle">User Profile</Typography>
-                  <VerticalStack>
-                    <FlexRowSpaceBetween>
-                      <Box>
-                        <Typography sx={{ fontWeight: 500 }}>Display Name</Typography>
-                        <Typography variant="body2" color="text.secondary">Name shown across the desktop workspace</Typography>
-                      </Box>
-                      <StyledTextField
-                        size="small"
-                        value={username}
-                        onChange={(e: any) => updateSetting('netlink_username', e.target.value, setUsername)}
-                      />
-                    </FlexRowSpaceBetween>
-                    <FlexRowSpaceBetween>
-                      <Box>
-                        <Typography sx={{ fontWeight: 500 }}>Language</Typography>
-                        <Typography variant="body2" color="text.secondary">Default system and app language</Typography>
-                      </Box>
-                      <StyledSelect size="small" defaultValue="en">
-                        <MenuItem value="en">English (US)</MenuItem>
-                        <MenuItem value="de">Deutsch (DE)</MenuItem>
-                        <MenuItem value="fr">Français (FR)</MenuItem>
-                        <MenuItem value="es">Español (ES)</MenuItem>
-                      </StyledSelect>
-                    </FlexRowSpaceBetween>
-                  </VerticalStack>
-                </StyledCardContent>
-              </StyledCard>
-
-              <StyledCard variant="outlined">
-                <StyledCardContent>
-                  <Typography variant="subtitle2" className="card-subtitle">Desktop Experience</Typography>
-                  <StyledFormGroup>
-                    <FlexRowSpaceBetween>
-                      <Box>
-                        <Typography sx={{ fontWeight: 500 }}>Window Animations</Typography>
-                        <Typography variant="body2" color="text.secondary">Smooth open, minimize, and restore transitions</Typography>
-                      </Box>
-                      <Switch
-                        checked={windowAnimations}
-                        onChange={(_e, checked) => updateSetting('netlink_animations', checked.toString(), () => setWindowAnimations(checked))}
-                      />
-                    </FlexRowSpaceBetween>
-                    <Divider sx={{ my: 1, borderColor: 'rgba(255,255,255,0.05)' }} />
-                    <FlexRowSpaceBetween>
-                      <Box>
-                        <Typography sx={{ fontWeight: 500 }}>Notification Sounds</Typography>
-                        <Typography variant="body2" color="text.secondary">Audio feedback for system events</Typography>
-                      </Box>
-                      <Switch
-                        checked={notificationSounds}
-                        onChange={(_e, checked) => updateSetting('netlink_sounds', checked.toString(), () => setNotificationSounds(checked))}
-                      />
-                    </FlexRowSpaceBetween>
-                    <Divider sx={{ my: 1, borderColor: 'rgba(255,255,255,0.05)' }} />
-                    <FlexRowSpaceBetween>
-                      <Box>
-                        <Typography sx={{ fontWeight: 500 }}>Debug Overlay & Diagnostic Logs</Typography>
-                        <Typography variant="body2" color="text.secondary">Display live VNC FPS, latency metrics, and relay logs</Typography>
-                      </Box>
-                      <Switch
-                        checked={debugMode}
-                        onChange={(_e, checked) => updateSetting('netlink_debug', checked.toString(), () => setDebugMode(checked))}
-                      />
-                    </FlexRowSpaceBetween>
-                  </StyledFormGroup>
-                </StyledCardContent>
-              </StyledCard>
-            </Box>
+            <GeneralTab
+              username={username}
+              setUsername={setUsername}
+              windowAnimations={windowAnimations}
+              setWindowAnimations={setWindowAnimations}
+              notificationSounds={notificationSounds}
+              setNotificationSounds={setNotificationSounds}
+              debugMode={debugMode}
+              setDebugMode={setDebugMode}
+              updateSetting={updateSetting}
+            />
           )}
+
 
           {/* Appearance Tab */}
           {activeTab === 'appearance' && (
@@ -950,17 +864,6 @@ const ThemeCard = ({ name, active, color, accent, onClick }: { name: string, act
 
 // Styled Components Wrappers
 const RootContainer = (props: any) => <Box className="root-container" {...props} />;
-const SidebarPaper = (props: any) => <Paper className="sidebar-paper" {...props} />;
-const SidebarHeader = (props: any) => <Box className="sidebar-header" {...props} />;
-const SidebarList = (props: any) => <List className="sidebar-list" {...props} />;
-const TabListItem = (props: any) => <ListItem className="tab-list-item" {...props} />;
-const TabButton = (props: any) => <ListItemButton className="tab-button" {...props} />;
-const TabIcon = ({ $active, ...props }: any) => {
-  return <ListItemIcon className="tab-icon" sx={{ color: $active ? '#38bdf8' : '#64748b' }} {...props} />;
-};
-const TabText = ({ $active, ...props }: any) => {
-  return <Typography sx={{ fontWeight: $active ? 600 : 500, color: $active ? '#38bdf8' : '#cbd5e1', fontSize: '0.92rem' }} {...props} />;
-};
 const MainContentContainer = (props: any) => <Box className="main-content-container" {...props} />;
 const ContentMaxWidth = (props: any) => <Box className="content-max-width" {...props} />;
 const StyledCard = ({ $mb, ...props }: any) => (
@@ -969,7 +872,6 @@ const StyledCard = ({ $mb, ...props }: any) => (
 const StyledCardContent = (props: any) => <CardContent className="styled-card-content" {...props} />;
 const VerticalStack = (props: any) => <Box className="vertical-stack" {...props} />;
 const FlexRowSpaceBetween = (props: any) => <Box className="flex-row-space-between" {...props} />;
-const StyledTextField = (props: any) => <TextField className="styled-text-field" {...props} />;
 const StyledSelect = (props: any) => <Select className="styled-select" {...props} />;
 const StyledFormGroup = (props: any) => <FormGroup className="styled-form-group" {...props} />;
 const FlexRowGap2 = (props: any) => <Box className="flex-row-gap-2" {...props} />;
