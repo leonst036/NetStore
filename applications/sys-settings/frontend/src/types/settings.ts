@@ -1,13 +1,17 @@
-export type ProtocolType = 'ssh' | 'sftp' | 'vnc' | 'smb';
+export type TabId = 'general' | 'appearance' | 'logins' | 'security' | 'users';
 
-export interface ServerLogin {
-    id: string;
-    name: string;
-    ip: string;
-    port: string;
-    loginUsername: string;
-    password?: string;
-    type: ProtocolType;
-    share?: string;
-    domain?: string;
+export type ThemeName = 'Dark' | 'Midnight' | 'Cyber';
+export type WallpaperPreset = 'default' | 'wp1' | 'wp2' | 'wp3' | 'solid';
+export type LanguageCode = 'en';
+export type DisplayScale = '100' | '125' | '150';
+
+export interface SystemSettingsState {
+    username: string;
+    language: LanguageCode;
+    wallpaper: WallpaperPreset;
+    theme: ThemeName;
+    windowAnimations: boolean;
+    notificationSounds: boolean;
+    debugMode: boolean;
+    displayScale: DisplayScale;
 }
