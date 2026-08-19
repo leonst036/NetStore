@@ -59,9 +59,6 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                             </Box>
                             <StyledSelect size="small" defaultValue="en">
                                 <MenuItem value="en">English (US)</MenuItem>
-                                <MenuItem value="de">Deutsch (DE)</MenuItem>
-                                <MenuItem value="fr">Français (FR)</MenuItem>
-                                <MenuItem value="es">Español (ES)</MenuItem>
                             </StyledSelect>
                         </FlexRowSpaceBetween>
                     </VerticalStack>
@@ -90,8 +87,17 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                             </Box>
                             <Switch
                                 checked={notificationSounds}
-                                onChange={(_e, checked) => updateSetting('netlink_sounds', checked.toString(), () => setNotificationSounds(checked))}
+                                onChange={(_e, checked) => {
+                                    if (checked) {
+                                        fetch('/api/sounds/notification').then(res => res.blob()).then(blob => {
+                                            const url = URL.createObjectURL(blob);
+                                            new Audio(url).play().catch(() => { });
+                                        });
+                                    }
+                                    updateSetting('netlink_sounds', checked.toString(), () => setNotificationSounds(checked));
+                                }}
                             />
+
                         </FlexRowSpaceBetween>
                         <Divider sx={{ my: 1, borderColor: 'rgba(255,255,255,0.05)' }} />
                         <FlexRowSpaceBetween>
