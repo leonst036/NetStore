@@ -21,10 +21,7 @@ async function readTopology() {
     try {
         const text = await Deno.readTextFile(dataFile);
         return JSON.parse(text);
-    } catch (error) {
-        if (error instanceof Deno.errors.NotFound) {
-            return { nodes: [], edges: [], nicknames: {} };
-        }
+    } catch {
         return { nodes: [], edges: [], nicknames: {} };
     }
 }
@@ -33,7 +30,7 @@ async function writeTopology(data: any) {
     try {
         await Deno.writeTextFile(dataFile, JSON.stringify(data, null, 2));
     } catch (error) {
-        console.error("Error writing topology file:", error);
+        console.error("[relay] Error writing topology file:", error);
     }
 }
 
@@ -85,7 +82,7 @@ async function getNetworkViaShell(): Promise<string | null> {
             }
         }
     } catch {
-        // Ignored
+        // Fallback
     }
     return null;
 }
@@ -97,14 +94,12 @@ async function getLocalNetworkRange(): Promise<{ startLong: number; endLong: num
         if (range) return range;
     }
 
-    // 1. Detect network range using shell command (works seamlessly with --allow-run=sh,ping)
     const shellCidr = await getNetworkViaShell();
     if (shellCidr) {
         const range = parseCidr(shellCidr);
         if (range) return range;
     }
 
-    // 2. Fallback to Deno.networkInterfaces if sys permission is granted
     try {
         const interfaces = (Deno as any).networkInterfaces?.();
         if (Array.isArray(interfaces)) {
@@ -129,7 +124,7 @@ async function getLocalNetworkRange(): Promise<{ startLong: number; endLong: num
             }
         }
     } catch {
-        // Ignored if sys permission is not available
+        // Fallback
     }
 
     return null;
@@ -147,7 +142,7 @@ async function reverseDns(ip: string): Promise<string | undefined> {
             return hostnames[0].replace(/\.$/, "");
         }
     } catch {
-        // PTR record not found or DNS lookup failed
+        // Ignore PTR failure
     }
     return undefined;
 }
@@ -178,7 +173,6 @@ async function scanDevice(ip: string): Promise<Device | null> {
 async function runNetworkScan(): Promise<Device[]> {
     const range = await getLocalNetworkRange();
     if (!range || range.startLong > range.endLong) {
-        console.error("Could not determine network range to scan.");
         return [];
     }
 
@@ -187,7 +181,7 @@ async function runNetworkScan(): Promise<Device[]> {
         ips.push(longToIp(currentLong));
     }
 
-    const CONCURRENCY_LIMIT = 20;
+    const concurrencyLimit = 20;
     const foundDevices: Device[] = [];
     let ipIndex = 0;
 
@@ -203,7 +197,7 @@ async function runNetworkScan(): Promise<Device[]> {
         }
     }
 
-    const numWorkers = Math.min(CONCURRENCY_LIMIT, ips.length);
+    const numWorkers = Math.min(concurrencyLimit, ips.length);
     const workers = Array.from({ length: numWorkers }, () => worker());
     await Promise.all(workers);
 
@@ -217,13 +211,13 @@ function triggerScan(force: boolean = false): Promise<Device[]> {
     }
     scanPromise = (async () => {
         try {
-            console.log("[net-graph] Performing automatic network scan...");
+            console.log("[relay] Performing network discovery scan...");
             const devices = await runNetworkScan();
             cachedDevices = devices;
-            console.log(`[net-graph] Scan completed. Discovered ${devices.length} devices.`);
+            console.log(`[relay] Scan completed. Discovered ${devices.length} devices.`);
             return devices;
         } catch (err) {
-            console.error("[net-graph] Error during network scan:", err);
+            console.error("[relay] Error during network scan:", err);
             return cachedDevices;
         } finally {
             scanPromise = null;
@@ -232,11 +226,15 @@ function triggerScan(force: boolean = false): Promise<Device[]> {
     return scanPromise;
 }
 
-// Run initial scan immediately on app install/startup
+// Initial background scan
 triggerScan();
+
+console.log(`[relay] NetGraph Relay running on port ${port}...`);
 
 Deno.serve({ port }, async (req) => {
     const url = new URL(req.url);
+    console.log(`[relay] ${req.method} ${url.pathname}`);
+
     const headers = new Headers({
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
@@ -244,9 +242,18 @@ Deno.serve({ port }, async (req) => {
         "Access-Control-Allow-Headers": "Content-Type, Authorization"
     });
 
-    if (req.method === "OPTIONS") return new Response(null, { status: 204, headers });
+    if (req.method === "OPTIONS") {
+        return new Response(null, { status: 204, headers });
+    }
 
-    if (url.pathname === "/api/net-graph/scan" || url.pathname === "/api/net-graph/servers") {
+    if (
+        url.pathname === "/api/net-graph/scan" ||
+        url.pathname === "/api/net-graph/servers" ||
+        url.pathname.endsWith("/scan") ||
+        url.pathname.endsWith("/servers") ||
+        url.pathname.includes("/scan") ||
+        url.pathname.includes("/servers")
+    ) {
         if (req.method === "GET") {
             try {
                 const force = url.searchParams.get("refresh") === "true" || url.searchParams.get("force") === "true";
@@ -264,16 +271,22 @@ Deno.serve({ port }, async (req) => {
         return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers });
     }
 
-    if (url.pathname === "/api/net-graph/topology") {
+    if (
+        url.pathname === "/api/net-graph/topology" ||
+        url.pathname.endsWith("/topology") ||
+        url.pathname.includes("/topology")
+    ) {
         try {
             if (req.method === "GET") {
                 const data = await readTopology();
                 return new Response(JSON.stringify(data), { status: 200, headers });
-            } 
+            }
             if (req.method === "POST") {
                 const body = await req.json();
                 const { nodes, edges, nicknames } = body;
-                if (!nodes || !edges) return new Response(JSON.stringify({ error: "nodes and edges required" }), { status: 400, headers });
+                if (!nodes || !edges) {
+                    return new Response(JSON.stringify({ error: "nodes and edges required" }), { status: 400, headers });
+                }
                 await writeTopology({ nodes, edges, nicknames: nicknames || {} });
                 return new Response(JSON.stringify({ success: true }), { status: 200, headers });
             }
@@ -282,5 +295,6 @@ Deno.serve({ port }, async (req) => {
             return new Response(JSON.stringify({ error: "Internal error", details: e.message }), { status: 500, headers });
         }
     }
+
     return new Response("Not Found", { status: 404, headers });
 });

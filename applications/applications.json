@@ -12,6 +12,12 @@
     "color": "#10b981",
     "shortDesc": "Real-time network topology visualization.",
     "fullDesc": "View and manage all connected devices in your subnet using an interactive node graph.",
+    "target": "local-server",
+    "defaultTarget": "local-server",
+    "targets": [
+      "local-server",
+      "relay"
+    ],
     "isFeatured": false
   },
   {
