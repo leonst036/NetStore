@@ -1,0 +1,191 @@
+/* ==========================================================================
+   NetGraph React Flow Nodes & Canvas Styling
+   ========================================================================== */
+
+/* Shared Node Layout & Typography */
+.net-node-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.net-node-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.net-node-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.net-node-title {
+  font-weight: 600;
+  color: #f8fafc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  line-height: 1.2;
+}
+
+.net-node-subtitle {
+  color: #94a3b8;
+  font-size: 0.725rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+/* React Flow Connection Handles */
+.net-node-handle {
+  width: 8px !important;
+  height: 8px !important;
+  border: 2px solid #0f172a !important;
+  border-radius: 50% !important;
+}
+
+/* --------------------------------------------------------------------------
+   1. Device Node (Sky Blue / Slate-900)
+   -------------------------------------------------------------------------- */
+.net-node-device {
+  position: relative;
+  min-width: 160px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background-color: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  cursor: pointer;
+}
+
+.net-node-device:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  background-color: rgba(30, 41, 59, 0.9);
+}
+
+.net-node-device.selected {
+  border-color: rgba(56, 189, 248, 0.8);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
+}
+
+.net-node-device .net-node-icon {
+  background-color: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+}
+
+.net-node-device .net-node-handle {
+  background-color: #38bdf8 !important;
+}
+
+/* --------------------------------------------------------------------------
+   2. Switch / Router Node (Purple / Violet)
+   -------------------------------------------------------------------------- */
+.net-node-switch {
+  position: relative;
+  min-width: 160px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background-color: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  cursor: pointer;
+}
+
+.net-node-switch:hover {
+  border-color: rgba(168, 85, 247, 0.65);
+  background-color: rgba(30, 41, 59, 0.9);
+}
+
+.net-node-switch.selected {
+  border-color: #a855f7;
+  box-shadow: 0 0 16px rgba(168, 85, 247, 0.4);
+}
+
+.net-node-switch .net-node-icon {
+  background-color: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+}
+
+.net-node-switch .net-node-handle {
+  background-color: #a855f7 !important;
+}
+
+/* --------------------------------------------------------------------------
+   3. Gateway / NAT Node (Amber / Orange)
+   -------------------------------------------------------------------------- */
+.net-node-gateway {
+  position: relative;
+  min-width: 160px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background-color: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(249, 115, 22, 0.35);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  cursor: pointer;
+}
+
+.net-node-gateway:hover {
+  border-color: rgba(249, 115, 22, 0.65);
+  background-color: rgba(30, 41, 59, 0.9);
+}
+
+.net-node-gateway.selected {
+  border-color: #f97316;
+  box-shadow: 0 0 16px rgba(249, 115, 22, 0.4);
+}
+
+.net-node-gateway .net-node-icon {
+  background-color: rgba(249, 115, 22, 0.15);
+  color: #fb923c;
+}
+
+.net-node-gateway .net-node-handle {
+  background-color: #f97316 !important;
+}
+
+/* --------------------------------------------------------------------------
+   4. Relay Node (Cyan / High-Tech Blue)
+   -------------------------------------------------------------------------- */
+.net-node-relay {
+  position: relative;
+  min-width: 160px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background-color: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(6, 182, 212, 0.35);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  cursor: pointer;
+}
+
+.net-node-relay:hover {
+  border-color: rgba(6, 182, 212, 0.65);
+  background-color: rgba(30, 41, 59, 0.9);
+}
+
+.net-node-relay.selected {
+  border-color: #06b6d4;
+  box-shadow: 0 0 16px rgba(6, 182, 212, 0.4);
+}
+
+.net-node-relay .net-node-icon {
+  background-color: rgba(6, 182, 212, 0.15);
+  color: #22d3ee;
+}
+
+.net-node-relay .net-node-handle {
+  background-color: #06b6d4 !important;
+}
