@@ -1,0 +1,9 @@
+{
+    "name": "netconnect-manager",
+    "version": "1.0.0",
+    "description": "Manage NetConnect in your network.",
+    "entrypoint": "frontend/dist/index.html",
+    "requestedPermissions": {
+        "allowNet": true
+    }
+}
