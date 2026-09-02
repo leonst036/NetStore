@@ -29,6 +29,8 @@ export interface NetworkGraphProps {
   ticket: string;
   isScanning?: boolean;
   onScanClick?: () => void;
+  cidr?: string;
+  onCidrChange?: (cidr: string) => void;
 }
 
 export default function NetworkGraph({
@@ -40,6 +42,8 @@ export default function NetworkGraph({
   ticket,
   isScanning = false,
   onScanClick = () => {},
+  cidr,
+  onCidrChange,
 }: NetworkGraphProps) {
   const deviceList = devices || servers || [];
   const [isEditMode, setIsEditMode] = useState(false);
@@ -121,6 +125,8 @@ export default function NetworkGraph({
         onNodeClick={onNodeClick}
         onVncClick={onVncClick}
         onSftpClick={onSftpClick}
+        cidr={cidr}
+        onCidrChange={onCidrChange}
       />
 
       {/* Main Graph Area */}
@@ -164,9 +170,18 @@ export default function NetworkGraph({
             elementsSelectable={true}
             edgesFocusable={isEditMode}
             fitView
+            proOptions={{ hideAttribution: true }}
           >
             <Controls />
-            <MiniMap nodeColor="#1e293b" maskColor="rgba(2, 6, 23, 0.8)" />
+            <MiniMap
+              nodeColor="#38bdf8"
+              maskColor="rgba(2, 6, 23, 0.7)"
+              style={{
+                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '8px',
+              }}
+            />
             <Background color="#1e293b" gap={20} />
           </ReactFlow>
         )}

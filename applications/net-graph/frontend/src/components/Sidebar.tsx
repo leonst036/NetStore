@@ -25,6 +25,8 @@ export interface SidebarProps {
     onNodeClick?: (ip: string) => void;
     onVncClick?: (ip: string) => void;
     onSftpClick?: (ip: string) => void;
+    cidr?: string;
+    onCidrChange?: (cidr: string) => void;
 }
 
 interface SidebarHeaderProps {
@@ -32,6 +34,8 @@ interface SidebarHeaderProps {
     onSearchChange: (search: string) => void;
     onScanClick: () => void;
     isScanning: boolean;
+    cidr?: string;
+    onCidrChange?: (cidr: string) => void;
 }
 
 const SidebarHeader = ({
@@ -39,6 +43,8 @@ const SidebarHeader = ({
     onSearchChange,
     onScanClick,
     isScanning,
+    cidr,
+    onCidrChange,
 }: SidebarHeaderProps) => {
     return (
         <Box className="sidebar-header">
@@ -55,6 +61,20 @@ const SidebarHeader = ({
                 >
                     {isScanning ? 'Scanning...' : 'Scan'}
                 </Button>
+            </Box>
+            <Box sx={{ mb: 1 }}>
+                <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="192.168.55.0/24"
+                    value={cidr || ''}
+                    onChange={(e) => onCidrChange?.(e.target.value)}
+                    helperText="Subnet CIDR"
+                    FormHelperTextProps={{ sx: { fontSize: '0.65rem', mt: 0.25, color: '#94a3b8' } }}
+                    InputProps={{
+                        sx: { fontSize: '0.8rem' }
+                    }}
+                />
             </Box>
             <TextField
                 fullWidth
@@ -86,6 +106,8 @@ export const Sidebar = ({
     onNodeClick,
     onVncClick,
     onSftpClick,
+    cidr,
+    onCidrChange,
 }: SidebarProps) => {
     const [search, setSearch] = useState('');
 
@@ -123,6 +145,8 @@ export const Sidebar = ({
                 onSearchChange={setSearch}
                 onScanClick={onScanClick}
                 isScanning={isScanning}
+                cidr={cidr}
+                onCidrChange={onCidrChange}
             />
 
             <List className="device-list" onWheelCapture={(e) => e.stopPropagation()}>
