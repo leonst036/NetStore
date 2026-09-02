@@ -30,7 +30,7 @@ async function writeTopology(data: any) {
     try {
         await Deno.writeTextFile(dataFile, JSON.stringify(data, null, 2));
     } catch (error) {
-        console.error("[local_server] Error writing topology file:", error);
+        console.error("[relay] Error writing topology file:", error);
     }
 }
 
@@ -78,7 +78,11 @@ async function getNetworkViaShell(): Promise<string | null> {
             for (const line of output.split("\n")) {
                 if (line.includes("docker") || line.includes("veth") || line.includes("br-") || line.includes("virbr")) continue;
                 const match = line.match(/inet\s+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\/[0-9]+)/);
-                if (match) return match[1];
+                if (match) {
+                    const cidr = match[1];
+                    if (cidr.startsWith("10.0.1.") || /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(cidr)) continue;
+                    return cidr;
+                }
             }
         }
     } catch {
@@ -104,7 +108,7 @@ async function getLocalNetworkRange(customCidr?: string | null, reqHeaders?: Hea
         const hostMatch = hostHeader.match(/^([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)/);
         if (hostMatch) {
             const hostIp = `${hostMatch[1]}.${hostMatch[2]}.${hostMatch[3]}.${hostMatch[4]}`;
-            if (!hostIp.startsWith("127.")) {
+            if (!hostIp.startsWith("127.") && !hostIp.startsWith("10.0.1.") && !/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostIp)) {
                 const range = parseCidr(`${hostMatch[1]}.${hostMatch[2]}.${hostMatch[3]}.0/24`);
                 if (range) return range;
             }
@@ -124,6 +128,8 @@ async function getLocalNetworkRange(customCidr?: string | null, reqHeaders?: Hea
                 if (
                     netInfo.family === "IPv4" &&
                     !netInfo.address.startsWith("127.") &&
+                    !netInfo.address.startsWith("10.0.1.") &&
+                    !/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(netInfo.address) &&
                     !netInfo.name.startsWith("docker") &&
                     !netInfo.name.startsWith("veth") &&
                     !netInfo.name.startsWith("br-")
@@ -151,12 +157,29 @@ function ipToInAddrArpa(ip: string): string {
     return ip.split('.').reverse().join('.') + '.in-addr.arpa';
 }
 
-async function reverseDns(ip: string): Promise<string | undefined> {
+async function reverseDns(ip: string, gatewayIp?: string): Promise<string | undefined> {
+    const arpa = ipToInAddrArpa(ip);
+
+    // 1. Try querying the local LAN gateway / router DNS server (e.g. 192.168.55.1:53)
+    const targetGateway = gatewayIp || ip.replace(/\.[0-9]+$/, '.1');
     try {
-        const arpa = ipToInAddrArpa(ip);
+        const hostnames = await Deno.resolveDns(arpa, "PTR", {
+            nameServer: { ipAddr: targetGateway, port: 53 }
+        });
+        if (hostnames && hostnames.length > 0) {
+            const clean = hostnames[0].replace(/\.$/, "").replace(/\.fritz\.box$/i, "").replace(/\.local$/i, "").replace(/\.lan$/i, "").replace(/\.home$/i, "").replace(/\.home\.arpa$/i, "");
+            if (clean && clean.length > 0) return clean;
+        }
+    } catch {
+        // Router DNS didn't answer or doesn't have PTR
+    }
+
+    // 2. Fallback to standard DNS resolver
+    try {
         const hostnames = await Deno.resolveDns(arpa, "PTR");
         if (hostnames && hostnames.length > 0) {
-            return hostnames[0].replace(/\.$/, "");
+            const clean = hostnames[0].replace(/\.$/, "").replace(/\.fritz\.box$/i, "").replace(/\.local$/i, "").replace(/\.lan$/i, "").replace(/\.home$/i, "").replace(/\.home\.arpa$/i, "");
+            if (clean && clean.length > 0) return clean;
         }
     } catch {
         // Ignore PTR failure
@@ -200,10 +223,10 @@ async function isHostAlive(ip: string): Promise<boolean> {
     return results.some(Boolean);
 }
 
-async function scanDevice(ip: string): Promise<Device | null> {
+async function scanDevice(ip: string, gatewayIp?: string): Promise<Device | null> {
     const isAlive = await isHostAlive(ip);
     if (isAlive) {
-        const hostname = await reverseDns(ip);
+        const hostname = await reverseDns(ip, gatewayIp);
         return { ip, hostname };
     }
     return null;
@@ -223,6 +246,7 @@ async function runNetworkScan(cidr?: string | null, reqHeaders?: Headers): Promi
         ips.push(longToIp(range.startLong + i));
     }
 
+    const gatewayIp = longToIp(range.startLong);
     const concurrencyLimit = 35;
     const foundDevices: Device[] = [];
     let ipIndex = 0;
@@ -231,7 +255,7 @@ async function runNetworkScan(cidr?: string | null, reqHeaders?: Headers): Promi
         while (ipIndex < ips.length) {
             const ip = ips[ipIndex++];
             if (ip !== undefined) {
-                const device = await scanDevice(ip);
+                const device = await scanDevice(ip, gatewayIp);
                 if (device) {
                     foundDevices.push(device);
                 }
@@ -285,6 +309,9 @@ async function syncMagicDns(nodes?: any[], nicknames?: Record<string, string>, s
     if (Array.isArray(scannedDevices)) {
         for (const dev of scannedDevices) {
             if (!dev.ip || typeof dev.ip !== 'string') continue;
+            // Skip Docker container IPs
+            if (dev.ip.startsWith('10.0.1.') || /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(dev.ip)) continue;
+
             const existing = ipMap.get(dev.ip) || { ip: dev.ip };
             if (dev.hostname && !existing.hostname) {
                 existing.hostname = dev.hostname;
@@ -293,9 +320,10 @@ async function syncMagicDns(nodes?: any[], nicknames?: Record<string, string>, s
             if (nick && !existing.nickname) {
                 existing.nickname = nick;
             }
-            if (existing.hostname || existing.nickname) {
-                ipMap.set(dev.ip, existing);
+            if (!existing.hostname && !existing.nickname) {
+                existing.hostname = `device-${dev.ip.replace(/\./g, '-')}`;
             }
+            ipMap.set(dev.ip, existing);
         }
     }
 
@@ -310,12 +338,12 @@ async function syncMagicDns(nodes?: any[], nicknames?: Record<string, string>, s
         });
         if (res.ok) {
             const data = await res.json();
-            console.log(`[local_server] Synced ${recordsToRegister.length} devices with MagicDNS:`, data);
+            console.log(`[relay] Synced ${recordsToRegister.length} devices with MagicDNS:`, data);
         } else {
-            console.warn(`[local_server] MagicDNS sync returned status ${res.status}`);
+            console.warn(`[relay] MagicDNS sync returned status ${res.status}`);
         }
     } catch (err: any) {
-        console.warn(`[local_server] MagicDNS sync notice: ${err.message}`);
+        console.warn(`[relay] MagicDNS sync notice: ${err.message}`);
     }
 }
 
@@ -325,15 +353,15 @@ function triggerScan(force: boolean = false, cidr?: string | null, reqHeaders?: 
     }
     scanPromise = (async () => {
         try {
-            console.log("[local_server] Performing network discovery scan...");
+            console.log("[relay] Performing network discovery scan...");
             const devices = await runNetworkScan(cidr, reqHeaders);
             cachedDevices = devices;
-            console.log(`[local_server] Scan completed. Discovered ${devices.length} devices.`);
+            console.log(`[relay] Scan completed. Discovered ${devices.length} devices.`);
             const topology = await readTopology();
             syncMagicDns(topology.nodes, topology.nicknames, devices);
             return devices;
         } catch (err) {
-            console.error("[local_server] Error during network scan:", err);
+            console.error("[relay] Error during network scan:", err);
             return cachedDevices;
         } finally {
             scanPromise = null;
@@ -350,11 +378,11 @@ readTopology().then((data) => {
 });
 triggerScan();
 
-console.log(`[local_server] NetGraph Local Server running on port ${port}...`);
+console.log(`[relay] NetGraph Relay running on port ${port}...`);
 
 Deno.serve({ port }, async (req) => {
     const url = new URL(req.url);
-    console.log(`[local_server] ${req.method} ${url.pathname}`);
+    console.log(`[relay] ${req.method} ${url.pathname}`);
 
     const headers = new Headers({
         "Content-Type": "application/json",
