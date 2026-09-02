@@ -205,6 +205,78 @@ async function runNetworkScan(): Promise<Device[]> {
     return foundDevices;
 }
 
+async function syncMagicDns(nodes?: any[], nicknames?: Record<string, string>, scannedDevices?: Device[]) {
+    const relayHost = getEnvSafe("RELAY_HOST") || "127.0.0.1";
+    const relayHttpPort = getEnvSafe("HTTP_PORT") || getEnvSafe("RELAY_PORT") || "4535";
+    const dnsUrl = `http://${relayHost}:${relayHttpPort}/api/dns/records`;
+
+    const ipMap = new Map<string, { ip: string; hostname?: string; nickname?: string }>();
+
+    if (Array.isArray(nodes)) {
+        for (const n of nodes) {
+            const nodeData = n.data || {};
+            const ip = nodeData.ip || (n.type === 'device' ? n.id : null);
+            if (!ip || typeof ip !== 'string' || !ip.match(/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/)) continue;
+
+            const hostname = nodeData.hostname;
+            const nickname = (nicknames && (nicknames[n.id] || nicknames[ip])) || nodeData.nickname;
+
+            if (hostname || nickname) {
+                ipMap.set(ip, {
+                    ip,
+                    hostname: hostname || undefined,
+                    nickname: nickname || undefined,
+                });
+            }
+        }
+    }
+
+    if (nicknames && typeof nicknames === 'object') {
+        for (const [ip, nick] of Object.entries(nicknames)) {
+            if (typeof ip !== 'string' || !ip.match(/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) || !nick) continue;
+            const existing = ipMap.get(ip) || { ip };
+            existing.nickname = nick;
+            ipMap.set(ip, existing);
+        }
+    }
+
+    if (Array.isArray(scannedDevices)) {
+        for (const dev of scannedDevices) {
+            if (!dev.ip || typeof dev.ip !== 'string') continue;
+            const existing = ipMap.get(dev.ip) || { ip: dev.ip };
+            if (dev.hostname && !existing.hostname) {
+                existing.hostname = dev.hostname;
+            }
+            const nick = nicknames?.[dev.ip];
+            if (nick && !existing.nickname) {
+                existing.nickname = nick;
+            }
+            if (existing.hostname || existing.nickname) {
+                ipMap.set(dev.ip, existing);
+            }
+        }
+    }
+
+    const recordsToRegister = Array.from(ipMap.values());
+    if (recordsToRegister.length === 0) return;
+
+    try {
+        const res = await fetch(dnsUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(recordsToRegister),
+        });
+        if (res.ok) {
+            const data = await res.json();
+            console.log(`[local_server] Synced ${recordsToRegister.length} devices with MagicDNS:`, data);
+        } else {
+            console.warn(`[local_server] MagicDNS sync returned status ${res.status}`);
+        }
+    } catch (err: any) {
+        console.warn(`[local_server] MagicDNS sync notice: ${err.message}`);
+    }
+}
+
 function triggerScan(force: boolean = false): Promise<Device[]> {
     if (scanPromise && !force) {
         return scanPromise;
@@ -215,6 +287,8 @@ function triggerScan(force: boolean = false): Promise<Device[]> {
             const devices = await runNetworkScan();
             cachedDevices = devices;
             console.log(`[local_server] Scan completed. Discovered ${devices.length} devices.`);
+            const topology = await readTopology();
+            syncMagicDns(topology.nodes, topology.nicknames, devices);
             return devices;
         } catch (err) {
             console.error("[local_server] Error during network scan:", err);
@@ -226,7 +300,12 @@ function triggerScan(force: boolean = false): Promise<Device[]> {
     return scanPromise;
 }
 
-// Initial background scan
+// Initial background scan and topology sync
+readTopology().then((data) => {
+    if (data && (data.nodes?.length > 0 || Object.keys(data.nicknames || {}).length > 0)) {
+        syncMagicDns(data.nodes, data.nicknames);
+    }
+});
 triggerScan();
 
 console.log(`[local_server] NetGraph Local Server running on port ${port}...`);
@@ -288,6 +367,8 @@ Deno.serve({ port }, async (req) => {
                     return new Response(JSON.stringify({ error: "nodes and edges required" }), { status: 400, headers });
                 }
                 await writeTopology({ nodes, edges, nicknames: nicknames || {} });
+                // Immediately synchronize updated hostnames and nicknames with MagicDNS
+                syncMagicDns(nodes, nicknames || {});
                 return new Response(JSON.stringify({ success: true }), { status: 200, headers });
             }
             return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers });
