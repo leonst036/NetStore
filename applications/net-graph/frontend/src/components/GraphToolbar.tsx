@@ -25,30 +25,32 @@ export const GraphToolbar = ({
         <Box className="toolbar-container">
             <Button
                 variant="contained"
+                size="small"
                 color={isEditMode ? "primary" : "inherit"}
                 onClick={() => setIsEditMode(!isEditMode)}
-                startIcon={<Pencil size={16} />}
+                startIcon={<Pencil size={15} />}
             >
                 {isEditMode ? 'Exit Edit Mode' : 'Edit Mode'}
             </Button>
 
             {isEditMode && (
                 <>
-                    <Button variant="contained" color="secondary" onClick={addSwitch} startIcon={<Settings2 size={16} />}>
+                    <Button variant="contained" size="small" color="secondary" onClick={addSwitch} startIcon={<Settings2 size={15} />}>
                         Add Switch
                     </Button>
                     <Button
                         variant="contained"
+                        size="small"
                         color="success"
                         onClick={saveTopology}
                         disabled={isSaving}
-                        startIcon={<Save size={16} />}
+                        startIcon={<Save size={15} />}
                     >
                         {isSaving ? 'Saving...' : 'Save Topology'}
                     </Button>
                     <Paper className="info-paper">
-                        <Typography variant="caption" color="text.secondary">
-                            Double-click to rename. Select and press Backspace to delete.
+                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.7rem' }}>
+                            Double-click node to rename. Select & press Backspace to delete.
                         </Typography>
                     </Paper>
                 </>

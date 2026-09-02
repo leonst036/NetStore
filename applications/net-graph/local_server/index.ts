@@ -49,7 +49,7 @@ function longToIp(long: number): string {
 
 function parseCidr(cidr: string): { startLong: number; endLong: number } | null {
     try {
-        const [ip, bitsStr] = cidr.split('/');
+        const [ip, bitsStr] = cidr.trim().split('/');
         const bits = parseInt(bitsStr, 10);
         if (isNaN(bits) || bits < 0 || bits > 32) return null;
         const maskLong = bits === 0 ? 0 : (~0 << (32 - bits)) >>> 0;
@@ -87,11 +87,28 @@ async function getNetworkViaShell(): Promise<string | null> {
     return null;
 }
 
-async function getLocalNetworkRange(): Promise<{ startLong: number; endLong: number } | null> {
+async function getLocalNetworkRange(customCidr?: string | null, reqHeaders?: Headers): Promise<{ startLong: number; endLong: number } | null> {
+    if (customCidr) {
+        const range = parseCidr(customCidr);
+        if (range) return range;
+    }
+
     const scanCidr = getEnvSafe("SCAN_CIDR");
     if (scanCidr) {
         const range = parseCidr(scanCidr);
         if (range) return range;
+    }
+
+    if (reqHeaders) {
+        const hostHeader = reqHeaders.get("host") || reqHeaders.get("x-forwarded-host") || "";
+        const hostMatch = hostHeader.match(/^([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)/);
+        if (hostMatch) {
+            const hostIp = `${hostMatch[1]}.${hostMatch[2]}.${hostMatch[3]}.${hostMatch[4]}`;
+            if (!hostIp.startsWith("127.")) {
+                const range = parseCidr(`${hostMatch[1]}.${hostMatch[2]}.${hostMatch[3]}.0/24`);
+                if (range) return range;
+            }
+        }
     }
 
     const shellCidr = await getNetworkViaShell();
@@ -127,7 +144,7 @@ async function getLocalNetworkRange(): Promise<{ startLong: number; endLong: num
         // Fallback
     }
 
-    return null;
+    return parseCidr("192.168.55.0/24");
 }
 
 function ipToInAddrArpa(ip: string): string {
@@ -161,8 +178,30 @@ async function pingHost(ip: string): Promise<boolean> {
     }
 }
 
+async function checkTcp(ip: string, port: number, timeoutMs = 250): Promise<boolean> {
+    try {
+        const connPromise = Deno.connect({ hostname: ip, port });
+        const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Timeout")), timeoutMs)
+        );
+        const conn = await Promise.race([connPromise, timeoutPromise]);
+        conn.close();
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+async function isHostAlive(ip: string): Promise<boolean> {
+    if (await pingHost(ip)) return true;
+    const commonPorts = [80, 443, 22, 53, 445, 4535, 8080, 5000, 3389];
+    const checks = commonPorts.map(p => checkTcp(ip, p, 250));
+    const results = await Promise.all(checks);
+    return results.some(Boolean);
+}
+
 async function scanDevice(ip: string): Promise<Device | null> {
-    const isAlive = await pingHost(ip);
+    const isAlive = await isHostAlive(ip);
     if (isAlive) {
         const hostname = await reverseDns(ip);
         return { ip, hostname };
@@ -170,18 +209,21 @@ async function scanDevice(ip: string): Promise<Device | null> {
     return null;
 }
 
-async function runNetworkScan(): Promise<Device[]> {
-    const range = await getLocalNetworkRange();
+async function runNetworkScan(cidr?: string | null, reqHeaders?: Headers): Promise<Device[]> {
+    const range = await getLocalNetworkRange(cidr, reqHeaders);
     if (!range || range.startLong > range.endLong) {
         return [];
     }
 
+    const maxIps = 512;
+    const count = Math.min(range.endLong - range.startLong + 1, maxIps);
+
     const ips: string[] = [];
-    for (let currentLong = range.startLong; currentLong <= range.endLong; currentLong++) {
-        ips.push(longToIp(currentLong));
+    for (let i = 0; i < count; i++) {
+        ips.push(longToIp(range.startLong + i));
     }
 
-    const concurrencyLimit = 20;
+    const concurrencyLimit = 35;
     const foundDevices: Device[] = [];
     let ipIndex = 0;
 
@@ -277,14 +319,14 @@ async function syncMagicDns(nodes?: any[], nicknames?: Record<string, string>, s
     }
 }
 
-function triggerScan(force: boolean = false): Promise<Device[]> {
+function triggerScan(force: boolean = false, cidr?: string | null, reqHeaders?: Headers): Promise<Device[]> {
     if (scanPromise && !force) {
         return scanPromise;
     }
     scanPromise = (async () => {
         try {
             console.log("[local_server] Performing network discovery scan...");
-            const devices = await runNetworkScan();
+            const devices = await runNetworkScan(cidr, reqHeaders);
             cachedDevices = devices;
             console.log(`[local_server] Scan completed. Discovered ${devices.length} devices.`);
             const topology = await readTopology();
@@ -336,11 +378,12 @@ Deno.serve({ port }, async (req) => {
         if (req.method === "GET") {
             try {
                 const force = url.searchParams.get("refresh") === "true" || url.searchParams.get("force") === "true";
+                const cidr = url.searchParams.get("cidr");
                 let devices = cachedDevices;
-                if (force) {
-                    devices = await triggerScan(true);
+                if (force || cidr) {
+                    devices = await triggerScan(true, cidr, req.headers);
                 } else if (cachedDevices.length === 0) {
-                    devices = scanPromise ? await scanPromise : await triggerScan();
+                    devices = scanPromise ? await scanPromise : await triggerScan(false, null, req.headers);
                 }
                 return new Response(JSON.stringify(devices), { status: 200, headers });
             } catch (e: any) {
@@ -367,7 +410,6 @@ Deno.serve({ port }, async (req) => {
                     return new Response(JSON.stringify({ error: "nodes and edges required" }), { status: 400, headers });
                 }
                 await writeTopology({ nodes, edges, nicknames: nicknames || {} });
-                // Immediately synchronize updated hostnames and nicknames with MagicDNS
                 syncMagicDns(nodes, nicknames || {});
                 return new Response(JSON.stringify({ success: true }), { status: 200, headers });
             }

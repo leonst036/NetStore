@@ -14,6 +14,13 @@
       "sh",
       "ip",
       "hostname"
+    ],
+    "allowEnv": [
+      "SCAN_CIDR",
+      "RELAY_HOST",
+      "HTTP_PORT",
+      "RELAY_PORT",
+      "HOST"
     ]
   }
 }

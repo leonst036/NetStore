@@ -53,12 +53,12 @@ export async function apiRequest<T>(
 }
 
 export const createApiClient = (ticket: string) => ({
-    get: <T>(endpoint: string, params?: Record<string, string | number | boolean | undefined>) =>
+    get: <T,>(endpoint: string, params?: Record<string, string | number | boolean | undefined>) =>
         apiRequest<T>(ticket, endpoint, { method: 'GET', params }),
-    post: <T>(endpoint: string, body?: unknown) =>
+    post: <T,>(endpoint: string, body?: unknown) =>
         apiRequest<T>(ticket, endpoint, { method: 'POST', body }),
-    put: <T>(endpoint: string, body?: unknown) =>
+    put: <T,>(endpoint: string, body?: unknown) =>
         apiRequest<T>(ticket, endpoint, { method: 'PUT', body }),
-    delete: <T>(endpoint: string, params?: Record<string, string | number | boolean | undefined>) =>
+    delete: <T,>(endpoint: string, params?: Record<string, string | number | boolean | undefined>) =>
         apiRequest<T>(ticket, endpoint, { method: 'DELETE', params }),
 });
