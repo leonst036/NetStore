@@ -35,7 +35,7 @@ Deno.serve({ port }, (req) => {
   // WebSocket support for streaming real-time relay stats
   if (req.headers.get("upgrade") === "websocket") {
     const { socket, response } = Deno.upgradeWebSocket(req);
-    let timer: number | undefined;
+    let timer: ReturnType<typeof setInterval> | undefined;
 
     socket.onopen = () => {
       timer = setInterval(() => {

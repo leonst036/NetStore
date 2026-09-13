@@ -1,8 +1,11 @@
 {
+  "id": "net-graph",
   "name": "net-graph",
   "version": "1.0.0",
   "description": "Network Topology Graph",
   "entrypoint": "frontend/dist/index.html",
+  "main": "frontend/dist/index.html",
+  "backend": "index.ts",
   "runInBackground": true,
   "requestedPermissions": {
     "allowRead": true,

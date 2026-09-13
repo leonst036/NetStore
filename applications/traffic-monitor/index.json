@@ -1,8 +1,11 @@
 {
   "id": "traffic-monitor",
   "version": "1.0.0",
+  "entrypoint": "frontend/index.html",
   "main": "frontend/main.tsx",
   "requestedPermissions": {
+    "allowRead": true,
+    "allowNet": true,
     "allowRun": true,
     "allowRunCommands": [
       "sh",

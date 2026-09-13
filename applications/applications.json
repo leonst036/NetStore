@@ -144,5 +144,20 @@
       "local-server"
     ],
     "isFeatured": true
+  },
+  {
+    "id": "netconnect-manager",
+    "name": "NetConnect Manager",
+    "author": "NetLink Native",
+    "category": "Utilities",
+    "rating": 5,
+    "downloads": "New",
+    "size": "Unknown",
+    "version": "v1.0.0",
+    "icon": "Network",
+    "color": "#38bdf8",
+    "shortDesc": "Manage NetConnect in your network.",
+    "fullDesc": "Configure and control NetConnect nodes, tunnels, and connectivity.",
+    "isFeatured": false
   }
 ]
