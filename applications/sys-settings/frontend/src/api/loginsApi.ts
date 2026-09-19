@@ -21,7 +21,7 @@ export const saveLogin = async (ticket: string, login: ServerLogin): Promise<voi
 
 export const deleteLogin = async (ticket: string, id: string): Promise<void> => {
     try {
-        await apiRequest<void>(ticket, `/api/server-logins/${id}`, { method: 'DELETE' });
+        await apiRequest<void>(ticket, `/api/server-logins?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
     } catch (error) {
         console.error('Failed to delete login', error);
     }

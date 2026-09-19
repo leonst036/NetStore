@@ -19,7 +19,8 @@ export async function getNodes(): Promise<NodeInfo[]> {
     const res = await fetch(`${API_BASE}/nodes`);
     if (res.ok) {
       const data = await res.json();
-      if (data.nodes && Array.isArray(data.nodes) && data.nodes.length > 0) {
+      if (data && Array.isArray(data.nodes)) {
+        saveLocalNodes(data.nodes);
         return data.nodes;
       }
     }
@@ -30,7 +31,7 @@ export async function getNodes(): Promise<NodeInfo[]> {
     const saved = localStorage.getItem('netlink_wings_nodes');
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) return parsed;
     }
   } catch {}
 
@@ -42,6 +43,32 @@ export function saveLocalNodes(nodes: NodeInfo[]): void {
   try {
     localStorage.setItem('netlink_wings_nodes', JSON.stringify(nodes));
   } catch {}
+}
+
+// Delete a node
+export async function deleteNode(nodeId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/nodes/${nodeId}`, {
+      method: 'DELETE',
+    });
+    if (res.ok) {
+      const current = await getNodes();
+      saveLocalNodes(current.filter((n) => n.id !== nodeId));
+      return true;
+    }
+  } catch {}
+
+  try {
+    const saved = localStorage.getItem('netlink_wings_nodes');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        saveLocalNodes(parsed.filter((n: NodeInfo) => n.id !== nodeId));
+      }
+    }
+  } catch {}
+
+  return true;
 }
 
 // Install or connect daemon on node
@@ -96,15 +123,6 @@ export async function getNodeServers(node: NodeInfo): Promise<NodeServerItem[]> 
     }
   } catch {}
 
-  // Direct fetch fallback to node daemon
-  try {
-    const res = await fetch(`http://${node.host}:${node.daemonPort}/api/servers`);
-    if (res.ok) {
-      const data = await res.json();
-      return data.servers || [];
-    }
-  } catch {}
-
   return [];
 }
 
@@ -116,18 +134,9 @@ export async function createNodeServer(node: NodeInfo, params: CreateServerParam
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params),
     });
-    if (res.ok) return await res.json();
-  } catch {}
-
-  try {
-    const res = await fetch(`http://${node.host}:${node.daemonPort}/api/servers/create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params),
-    });
     return await res.json();
   } catch (err: any) {
-    return { success: false, error: err.message };
+    return { success: false, error: err.message || 'Failed to create server' };
   }
 }
 
@@ -139,18 +148,9 @@ export async function powerNodeServer(node: NodeInfo, serverId: string, action: 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action }),
     });
-    if (res.ok) return await res.json();
-  } catch {}
-
-  try {
-    const res = await fetch(`http://${node.host}:${node.daemonPort}/api/servers/${serverId}/power`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action }),
-    });
     return await res.json();
   } catch (err: any) {
-    return { success: false, error: err.message };
+    return { success: false, error: err.message || 'Failed to send power action' };
   }
 }
 
@@ -162,18 +162,9 @@ export async function sendNodeServerCommand(node: NodeInfo, serverId: string, co
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ command }),
     });
-    if (res.ok) return await res.json();
-  } catch {}
-
-  try {
-    const res = await fetch(`http://${node.host}:${node.daemonPort}/api/servers/${serverId}/command`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ command }),
-    });
     return await res.json();
   } catch (err: any) {
-    return { success: false, error: err.message };
+    return { success: false, error: err.message || 'Failed to send command' };
   }
 }
 
@@ -186,15 +177,6 @@ export async function getNodeServerLogs(node: NodeInfo, serverId: string): Promi
       return data.logs || [];
     }
   } catch {}
-
-  try {
-    const res = await fetch(`http://${node.host}:${node.daemonPort}/api/servers/${serverId}/logs`);
-    if (res.ok) {
-      const data = await res.json();
-      return data.logs || [];
-    }
-  } catch {}
-
   return [];
 }
 
@@ -206,14 +188,6 @@ export async function getNodeServerStats(node: NodeInfo, serverId: string): Prom
       return await res.json();
     }
   } catch {}
-
-  try {
-    const res = await fetch(`http://${node.host}:${node.daemonPort}/api/servers/${serverId}/stats`);
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch {}
-
   return null;
 }
 
@@ -229,18 +203,9 @@ export async function updateNodeServerResources(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(limits),
     });
-    if (res.ok) return await res.json();
-  } catch {}
-
-  try {
-    const res = await fetch(`http://${node.host}:${node.daemonPort}/api/servers/${serverId}/resources`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(limits),
-    });
     return await res.json();
   } catch (err: any) {
-    return { success: false, error: err.message };
+    return { success: false, error: err.message || 'Failed to update server resources' };
   }
 }
 
@@ -356,18 +321,6 @@ export async function createNodeServerFolder(node: NodeInfo, serverId: string, p
 
 // 6. Get overall Node host machine telemetry and resource utilization
 export async function getNodeSystemStats(node: NodeInfo): Promise<import('./types').NodeSystemStats | null> {
-  if (node.host && node.daemonPort) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
-      const res = await fetch(`http://${node.host}:${node.daemonPort}/api/node/system-stats`, {
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      if (res.ok) return await res.json();
-    } catch {}
-  }
-
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3500);
@@ -389,25 +342,23 @@ export async function checkNodeHealth(node: NodeInfo): Promise<{
   uptimeSeconds?: number;
 }> {
   const start = performance.now();
-  if (node.host && node.daemonPort) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
-      const res = await fetch(`http://${node.host}:${node.daemonPort}/api/health`, {
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      if (res.ok) {
-        const data = await res.json();
-        return {
-          online: data.status === 'online',
-          latencyMs: Math.round(performance.now() - start),
-          version: data.version,
-          uptimeSeconds: data.uptimeSeconds,
-        };
-      }
-    } catch {}
-  }
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    const res = await fetch(`${API_BASE}/node/${node.id}/health`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        online: data.status === 'online',
+        latencyMs: Math.round(performance.now() - start),
+        version: data.version,
+        uptimeSeconds: data.uptimeSeconds,
+      };
+    }
+  } catch {}
 
   try {
     const controller = new AbortController();
@@ -982,13 +933,6 @@ export async function getServerSoftware(
   node: NodeInfo,
   serverId: string
 ): Promise<ServerSoftwareResponse | null> {
-  if (node.host && node.daemonPort) {
-    try {
-      const res = await fetch(`http://${node.host}:${node.daemonPort}/api/servers/${serverId}/software`);
-      if (res.ok) return await res.json();
-    } catch {}
-  }
-
   try {
     const res = await fetch(`${API_BASE}/node/${node.id}/servers/${serverId}/software`);
     if (res.ok) return await res.json();
@@ -1003,23 +947,13 @@ export async function updateServerSoftware(
   serverId: string,
   payload: ChangeSoftwarePayload
 ): Promise<{ success: boolean; software?: string; version?: string; error?: string }> {
-  if (node.host && node.daemonPort) {
-    try {
-      const res = await fetch(`http://${node.host}:${node.daemonPort}/api/servers/${serverId}/software`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) return await res.json();
-    } catch {}
-  }
-
   try {
     const res = await fetch(`${API_BASE}/node/${node.id}/servers/${serverId}/software`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
+    if (res.ok) return await res.json();
     return await res.json();
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to update server software' };
@@ -1034,14 +968,6 @@ export async function getSoftwareBuilds(
   version: string
 ): Promise<SoftwareBuildsResponse | null> {
   const query = `software=${encodeURIComponent(software)}&version=${encodeURIComponent(version)}`;
-
-  if (node.host && node.daemonPort) {
-    try {
-      const res = await fetch(`http://${node.host}:${node.daemonPort}/api/servers/${serverId}/software/builds?${query}`);
-      if (res.ok) return await res.json();
-    } catch {}
-  }
-
   try {
     const res = await fetch(`${API_BASE}/node/${node.id}/servers/${serverId}/software/builds?${query}`);
     if (res.ok) return await res.json();

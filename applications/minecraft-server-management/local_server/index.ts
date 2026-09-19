@@ -4,6 +4,7 @@ import {
   saveNode,
   getNode,
   getAllNodes,
+  deleteNode,
   recordAuditEvent,
   getAuditEvents,
   NodeRecord,
@@ -121,6 +122,15 @@ Deno.serve({ port }, async (req) => {
     return jsonResponse({ nodes });
   }
 
+  // DELETE .../nodes/:nodeId - Remove persistent node
+  const nodeDeleteMatch = url.pathname.match(/\/nodes\/([^\/]+)(?:\/)?$/);
+  if (req.method === "DELETE" && nodeDeleteMatch) {
+    const nodeId = nodeDeleteMatch[1];
+    await deleteNode(nodeId);
+    await recordAuditEvent("NODE_DELETED", { nodeId });
+    return jsonResponse({ success: true, nodeId });
+  }
+
   // GET .../audit-logs - Query audit events
   if (req.method === "GET" && url.pathname.includes("/audit-logs")) {
     const logs = await getAuditEvents();
@@ -211,7 +221,8 @@ Deno.serve({ port }, async (req) => {
     }
 
     try {
-      const targetUrl = `http://${node.host}:${node.daemonPort}/api/${subPath}`;
+      const normalizedSubPath = subPath === "system-stats" ? "node/system-stats" : subPath;
+      const targetUrl = `http://${node.host}:${node.daemonPort}/api/${normalizedSubPath}${url.search}`;
       const forwardHeaders: Record<string, string> = {
         "Content-Type": "application/json",
       };

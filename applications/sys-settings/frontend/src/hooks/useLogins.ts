@@ -13,12 +13,12 @@ export const useLogins = (ticket: string) => {
         setLoading(true);
         setError(null);
         try {
-            const response = await fetch('/api/logins', {
+            const response = await fetch('/api/server-logins', {
                 headers: { 'Authorization': `Ticket ${ticket}` }
             });
             const data = await response.json();
-            if (data.success) {
-                setLogins(data.logins);
+            if (data.success || data.logins) {
+                setLogins(data.logins || []);
             } else {
                 setError(data.error);
             }
@@ -31,7 +31,7 @@ export const useLogins = (ticket: string) => {
 
     const addLogin = async (login: any) => {
         try {
-            const response = await fetch('/api/logins', {
+            const response = await fetch('/api/server-logins', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -52,8 +52,8 @@ export const useLogins = (ticket: string) => {
 
     const updateLogin = async (login: any) => {
         try {
-            const response = await fetch('/api/logins', {
-                method: 'PUT',
+            const response = await fetch('/api/server-logins', {
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Ticket ${ticket}`
@@ -73,7 +73,7 @@ export const useLogins = (ticket: string) => {
 
     const deleteLogin = async (id: string) => {
         try {
-            const response = await fetch(`/api/logins/${id}`, {
+            const response = await fetch(`/api/server-logins?id=${encodeURIComponent(id)}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Ticket ${ticket}` }
             });

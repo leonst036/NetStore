@@ -9,8 +9,9 @@ import {
   FormControl,
   keyframes,
   Chip,
+  IconButton,
 } from '@mui/material';
-import { Server, Plus, RefreshCw, Activity, WifiOff } from 'lucide-react';
+import { Server, Plus, RefreshCw, Activity, WifiOff, Trash2 } from 'lucide-react';
 
 import { NodeInfo } from '../types';
 
@@ -30,6 +31,7 @@ interface HeaderProps {
   onOpenInstallModal: () => void;
   onOpenNodeMetrics?: () => void;
   onGoToServerList?: () => void;
+  onDeleteNode?: (nodeId: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -43,6 +45,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenInstallModal,
   onOpenNodeMetrics,
   onGoToServerList,
+  onDeleteNode,
 }) => {
   return (
     <Box
@@ -155,6 +158,25 @@ export const Header: React.FC<HeaderProps> = ({
                   border: isNodeOnline ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(239, 68, 68, 0.4)',
                 }}
               />
+            )}
+
+            {activeNode && onDeleteNode && (
+              <IconButton
+                size="small"
+                title={`Disconnect and remove node "${activeNode.name}"`}
+                onClick={() => {
+                  if (window.confirm(`Disconnect and remove Wings node "${activeNode.name}" (${activeNode.host})?`)) {
+                    onDeleteNode(activeNode.id);
+                  }
+                }}
+                sx={{
+                  color: '#94a3b8',
+                  padding: 0.5,
+                  '&:hover': { color: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)' }
+                }}
+              >
+                <Trash2 size={16} />
+              </IconButton>
             )}
           </Stack>
         )}

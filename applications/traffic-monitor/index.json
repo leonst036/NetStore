@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "entrypoint": "frontend/index.html",
   "main": "frontend/main.tsx",
+  "requiredExternalFolders": [
+    { "path": "/proc", "mode": "read", "reason": "Read network device statistics and TCP socket counts" }
+  ],
   "requestedPermissions": {
     "allowRead": true,
     "allowNet": true,

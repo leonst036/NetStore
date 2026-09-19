@@ -73,9 +73,9 @@ export const useUsers = (ticket: string, activeTab: TabId, canManageUsers: boole
         }
     };
 
-    const deleteUser = async (id: string) => {
+    const deleteUser = async (username: string) => {
         try {
-            const response = await fetch(`/api/users/${id}`, {
+            const response = await fetch(`/api/users?username=${encodeURIComponent(username)}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Ticket ${ticket}` }
             });

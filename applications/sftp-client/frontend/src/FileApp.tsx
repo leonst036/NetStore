@@ -25,7 +25,7 @@ import {
   TextField
 } from '@mui/material';
 import './FileApp.css';
-import { GeminiLoader } from '@netlink/ui';
+import { NetLinkLoader } from '@netlink/ui';
 import SftpLogin from './SftpLogin';
 import SmbLogin from './SmbLogin';
 
@@ -465,7 +465,7 @@ export default function FileApp({ ticket, target, initialIp }: FileAppProps) {
       {/* Connecting Loader */}
       {status === 'connecting' && (
         <LoadingContainer>
-          <GeminiLoader size={64} />
+          <NetLinkLoader size={64} />
           <LoadingText color="text.secondary">{statusMessage}</LoadingText>
         </LoadingContainer>
       )}

@@ -30,7 +30,7 @@ async function writeTopology(data: any) {
     try {
         await Deno.writeTextFile(dataFile, JSON.stringify(data, null, 2));
     } catch (error) {
-        console.error("[relay] Error writing topology file:", error);
+        console.error("[net-graph] Error writing topology file:", error);
     }
 }
 
@@ -353,15 +353,15 @@ function triggerScan(force: boolean = false, cidr?: string | null, reqHeaders?: 
     }
     scanPromise = (async () => {
         try {
-            console.log("[relay] Performing network discovery scan...");
+            console.log("[net-graph] Performing network discovery scan...");
             const devices = await runNetworkScan(cidr, reqHeaders);
             cachedDevices = devices;
-            console.log(`[relay] Scan completed. Discovered ${devices.length} devices.`);
+            console.log(`[net-graph] Scan completed. Discovered ${devices.length} devices.`);
             const topology = await readTopology();
             syncMagicDns(topology.nodes, topology.nicknames, devices);
             return devices;
         } catch (err) {
-            console.error("[relay] Error during network scan:", err);
+            console.error("[net-graph] Error during network scan:", err);
             return cachedDevices;
         } finally {
             scanPromise = null;
@@ -378,11 +378,11 @@ readTopology().then((data) => {
 });
 triggerScan();
 
-console.log(`[relay] NetGraph Relay running on port ${port}...`);
+console.log(`[net-graph] Local Server running on port ${port}...`);
 
 Deno.serve({ port }, async (req) => {
     const url = new URL(req.url);
-    console.log(`[relay] ${req.method} ${url.pathname}`);
+    console.log(`[net-graph] ${req.method} ${url.pathname}`);
 
     const headers = new Headers({
         "Content-Type": "application/json",

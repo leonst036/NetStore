@@ -33,6 +33,7 @@ import { NodeInfo, NodeServerItem } from './types';
 import {
   getNodes,
   saveLocalNodes,
+  deleteNode,
   getNodeServers,
   powerNodeServer,
   sendNodeServerCommand,
@@ -300,6 +301,20 @@ export default function App() {
     setViewMode('detail');
   };
 
+  const handleDeleteNode = async (nodeId: string) => {
+    try {
+      await deleteNode(nodeId);
+      const updated = nodes.filter((n) => n.id !== nodeId);
+      setNodes(updated);
+      saveLocalNodes(updated);
+      setActiveNodeId(updated.length > 0 ? updated[0].id : null);
+      setViewMode('list');
+      setToast({ message: 'Node removed successfully.', type: 'info' });
+    } catch (err: any) {
+      setToast({ message: `Failed to remove node: ${err.message}`, type: 'error' });
+    }
+  };
+
   // Completely silent and stable refresh without scroll jumps
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -343,6 +358,7 @@ export default function App() {
               }}
               onOpenInstallModal={() => setInstallModalOpen(true)}
               onOpenNodeMetrics={() => setNodeMetricsOpen(true)}
+              onDeleteNode={handleDeleteNode}
             />
 
             {/* Global Node Offline Banner Bar */}

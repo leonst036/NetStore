@@ -1,7 +1,8 @@
 import { createTheme } from '@mui/material/styles';
 
 export * from '@mui/material';
-export * from './components/GeminiLoader';
+export * from './components/NetLinkLoader';
+export { GeminiLoader, type GeminiLoaderProps } from './components/GeminiLoader';
 export * from './components/WindowLayout';
 
 export const getAppTheme = (themeName: string) => {
@@ -14,4 +15,3 @@ export const getAppTheme = (themeName: string) => {
         }
     });
 };
-

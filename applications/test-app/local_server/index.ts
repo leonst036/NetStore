@@ -1,7 +1,6 @@
 // Test Application Local Server
-console.log("Test Application local_server has been successfully started by NetLink sandbox!");
+const port = parseInt(Deno.env.get("PORT") || "8000");
 
-// Provide a simple function that could be called if this app had API endpoints
 export function getTestStatus() {
     return {
         status: "Running",
@@ -9,3 +8,9 @@ export function getTestStatus() {
         timestamp: new Date().toISOString()
     };
 }
+
+Deno.serve({ port }, () => {
+    return new Response(JSON.stringify(getTestStatus()), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+    });
+});

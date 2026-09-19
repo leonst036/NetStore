@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { DiscoveredDevice } from '../types/device';
 import { fetchDiscoveredDevices } from '../api/scanApi';
 import { sendNotification } from '../bridge/netlinkBridge';
@@ -7,6 +7,8 @@ export function useNetworkScan(ticket: string) {
     const [devices, setDevices] = useState<DiscoveredDevice[]>([]);
     const [isScanning, setIsScanning] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const isMountedRef = useRef<boolean>(true);
 
     // Auto-detect default subnet from window location if IP
     const defaultCidr = (() => {
@@ -25,6 +27,12 @@ export function useNetworkScan(ticket: string) {
     });
 
     const scan = useCallback(async (refresh: boolean = false, targetCidr?: string) => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
         setIsScanning(true);
         setError(null);
         const effectiveCidr = targetCidr !== undefined ? targetCidr : cidr;
@@ -34,20 +42,33 @@ export function useNetworkScan(ticket: string) {
             } catch {}
         }
         try {
-            const result = await fetchDiscoveredDevices(ticket, refresh, effectiveCidr);
+            const result = await fetchDiscoveredDevices(ticket, refresh, effectiveCidr, controller.signal);
+            if (!isMountedRef.current) return;
             setDevices(result || []);
         } catch (err: any) {
+            if (!isMountedRef.current || controller.signal.aborted || err?.name === 'AbortError') {
+                return;
+            }
             const message = err?.message || 'Failed to scan network';
             setError(message);
             console.error('Network scan failed:', err);
             sendNotification(message, 'error');
         } finally {
-            setIsScanning(false);
+            if (isMountedRef.current) {
+                setIsScanning(false);
+            }
         }
     }, [ticket, cidr]);
 
     useEffect(() => {
+        isMountedRef.current = true;
         scan(false);
+        return () => {
+            isMountedRef.current = false;
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
     }, [scan]);
 
     return {

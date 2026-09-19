@@ -25,24 +25,6 @@ interface ServerTrafficStats {
 let lastTimestamp = Date.now();
 let prevStatsMap: Map<string, { rxBytes: number; txBytes: number }> = new Map();
 
-// Persistent fallback interface counters
-interface MockIfaceState {
-  name: string;
-  rxBytes: number;
-  txBytes: number;
-  rxPackets: number;
-  txPackets: number;
-  baseRxSpeed: number;
-  baseTxSpeed: number;
-}
-
-const mockInterfacesState: MockIfaceState[] = [
-  { name: "eth0", rxBytes: 15420000, txBytes: 8930000, rxPackets: 12500, txPackets: 9800, baseRxSpeed: 350000, baseTxSpeed: 180000 },
-  { name: "wlan0", rxBytes: 4200000, txBytes: 1100000, rxPackets: 3200, txPackets: 1400, baseRxSpeed: 80000, baseTxSpeed: 40000 },
-  { name: "lo", rxBytes: 980000, txBytes: 980000, rxPackets: 1200, txPackets: 1200, baseRxSpeed: 1024, baseTxSpeed: 1024 }
-];
-let lastMockTimestamp = Date.now();
-
 // Helper to read Linux network statistics
 async function readLinuxNetDev(): Promise<{ interfaces: NetworkInterfaceStats[]; totalRx: number; totalTx: number }> {
   try {

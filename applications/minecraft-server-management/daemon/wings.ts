@@ -95,7 +95,7 @@ Deno.serve({ port }, async (req) => {
   }
 
   // 2. GET /api/node/system-stats - Node host machine hardware utilization & metrics
-  if (req.method === "GET" && (url.pathname === "/api/node/system-stats" || url.pathname === "/api/node/stats")) {
+  if (req.method === "GET" && (url.pathname === "/api/node/system-stats" || url.pathname === "/api/node/stats" || url.pathname === "/api/system-stats")) {
     const stats = await getNodeSystemStats(dataDir);
     return jsonResponse(stats);
   }
